@@ -1,6 +1,6 @@
 {
   "name": "Adarco Inside Sales Dashboard",
-  "description": "Dashboard de performance de telefonia para o time de Inside Sales da Adarco.",
+  "description": "Dashboard de Inside Sales para Adarco, com análise de performance e integração de API (compatível com Vercel e Cloud Run).",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

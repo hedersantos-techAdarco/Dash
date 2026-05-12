@@ -66,6 +66,15 @@ const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
 
 export default function App() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+
+  React.useEffect(() => {
+    fetch('/api/health')
+      .then(res => res.json())
+      .then(data => setServerStatus(data.status === 'ok' ? 'online' : 'offline'))
+      .catch(() => setServerStatus('offline'));
+  }, []);
+
   const [data, setData] = useState<CallRecord[]>([]);
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: [null, null],
@@ -94,7 +103,7 @@ export default function App() {
             const timestampStr = row['Data'] || '';
             let timestamp = new Date();
             try {
-              timestamp = parse(timestampStr, 'yyyy-MM-dd HH:mm:ss', new Date());
+              timestamp = parse(timestampStr, 'yyyy-MM-dd HH:mm:ss', new Date(), { locale: ptBR });
               if (isNaN(timestamp.getTime())) {
                 timestamp = new Date(timestampStr);
               }
@@ -176,7 +185,7 @@ export default function App() {
   const callsByDay = useMemo(() => {
     const groups: Record<string, { date: string, count: number }> = {};
     dashboardData.forEach(d => {
-      const day = format(d.timestamp, 'dd/MM');
+      const day = format(d.timestamp, 'dd/MM', { locale: ptBR });
       if (!groups[day]) groups[day] = { date: day, count: 0 };
       groups[day].count++;
     });
@@ -205,15 +214,21 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-emerald-900 text-white px-6 py-4 flex items-center justify-between shadow-lg sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-500 p-2 rounded-lg">
-            <PhoneCall className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500 p-2 rounded-lg">
+              <PhoneCall className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">Adarco</h1>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] text-emerald-300 uppercase font-semibold tracking-widest">Inside Sales Performance</p>
+                <div className={cn(
+                  "w-1.5 h-1.5 rounded-full animate-pulse",
+                  serverStatus === 'online' ? "bg-emerald-400" : "bg-red-400"
+                )} />
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">Adarco</h1>
-            <p className="text-[10px] text-emerald-300 uppercase font-semibold tracking-widest">Inside Sales Performance</p>
-          </div>
-        </div>
 
         <input 
           type="file" 
