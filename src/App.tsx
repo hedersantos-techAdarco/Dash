@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import Papa from 'papaparse';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Cell, TooltipProps
+  Cell, TooltipProps, PieChart, Pie
 } from 'recharts';
 import { 
   Phone, PhoneCall, PhoneIncoming, PhoneOutgoing, 
@@ -73,22 +73,34 @@ const StatCard = ({ title, value, subtext, icon: Icon, trend, colorClass = "prim
   </motion.div>
 );
 
-const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
+const EmptyState = ({ onUpload, onSync, isSyncing }: { onUpload: () => void, onSync: () => void, isSyncing: boolean }) => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
     <div className="w-16 h-16 md:w-20 md:h-20 bg-adarco-light/30 rounded-full flex items-center justify-center mb-6">
       <Users className="w-8 h-8 md:w-10 md:h-10 text-adarco-dark" />
     </div>
     <h2 className="text-2xl md:text-3xl font-black text-adarco-dark tracking-tighter mb-2 text-center md:text-left">Dashboard Inside Sales</h2>
     <p className="text-slate-500 max-w-md mb-8 font-medium text-center md:text-left text-sm md:text-base">
-      Carregue o log de telefonia (CSV) para visualizar a performance dos <strong>Times do Inside Sales</strong>.
+      Sincronize os dados diretamente da API de telefonia ou carregue um relatório CSV manualmente.
     </p>
-    <button 
-      onClick={onUpload}
-      className="flex items-center gap-2 bg-adarco-dark hover:bg-black text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95"
-    >
-      <Upload size={20} />
-      Carregar Relatório CSV
-    </button>
+    <div className="flex flex-col sm:flex-row gap-4">
+      <button 
+        onClick={onSync}
+        disabled={isSyncing}
+        className={cn(
+          "flex items-center justify-center gap-2 bg-adarco-dark hover:bg-black text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed min-w-[220px]",
+          isSyncing && "animate-pulse"
+        )}
+      >
+        {isSyncing ? "Sincronizando..." : <><TrendingUp size={20} /> Sincronizar API</>}
+      </button>
+      <button 
+        onClick={onUpload}
+        className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-8 py-3 rounded-xl font-semibold transition-all shadow-sm active:scale-95"
+      >
+        <Upload size={20} />
+        Carregar CSV
+      </button>
+    </div>
   </div>
 );
 
@@ -116,13 +128,30 @@ export default function App() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [data, setData] = useState<CallRecord[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>('Todos');
   const [selectedConsultant, setSelectedConsultant] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('Todos');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(1); // Primeiro dia do mês atual
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Sincroniza automaticamente ao abrir o sistema e a cada 5 minutos
+  React.useEffect(() => {
+    syncWithAPI();
+    
+    const interval = setInterval(() => {
+      console.log("[Auto-Refresh] Iniciando atualização programada (5 min)...");
+      syncWithAPI();
+    }, 5 * 60 * 1000); // 5 minutos
+
+    return () => clearInterval(interval);
+  }, [startDate, endDate]);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -136,6 +165,99 @@ export default function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const syncWithAPI = async () => {
+    setIsSyncing(true);
+    setErrorMsg(null);
+    try {
+      const params = new URLSearchParams();
+      
+      // Se tiver data, garante que pega o dia inteiro (00:00 até 23:59)
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        params.append("startDate", start.toISOString());
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        params.append("endDate", end.toISOString());
+      }
+      
+      params.append("limit", "1000");
+
+      console.log("[App] Sincronizando com params:", params.toString());
+      const response = await fetch(`/api/telephony/calls?${params.toString()}`);
+      
+      if (!response.ok) {
+        let errorInfo;
+        try {
+          errorInfo = await response.json();
+        } catch {
+          errorInfo = { error: "Erro desconhecido na rede." };
+        }
+        
+        const detail = errorInfo.detail ? (typeof errorInfo.detail === 'object' ? JSON.stringify(errorInfo.detail) : errorInfo.detail) : "";
+        throw new Error(`${errorInfo.error || "Falha na API"} ${detail}`);
+      }
+
+      const result = await response.json();
+      console.log("[App] Resultado bruto da API:", result);
+      
+      // Verificando se é array ou tem campo data
+      // Algumas APIs paginadas retornam { data: [], total: ... } ou { calls: [], ... }
+      const rawCalls = Array.isArray(result) 
+        ? result 
+        : (result.data || result.calls || result.ligacoes || []);
+
+      console.log(`[App] Total de chamadas brutas recebidas: ${rawCalls.length}`);
+
+      if (rawCalls.length === 0) {
+        setErrorMsg("A API retornou zero chamadas para este período. Verifique se há dados no painel da Bem Melhor ou tente aumentar o intervalo de datas.");
+        return;
+      }
+
+      const processedData: CallRecord[] = rawCalls.map((call: any) => {
+        const origin = String(call.origin || '');
+        const destiny = String(call.destiny || '');
+        const mappingOrig = CONSULTANT_MAPPING[origin];
+        const mappingDest = CONSULTANT_MAPPING[destiny];
+        
+        const consultant = mappingOrig || mappingDest;
+        const typeRaw = String(call.type || '').toLowerCase();
+        
+        let type = '';
+        if (typeRaw.includes('sainte') || typeRaw.includes('outbound')) {
+          type = 'Ativa';
+        } else if (typeRaw.includes('entrante') || typeRaw.includes('inbound')) {
+          type = 'Receptiva';
+        }
+
+        const disposition = String(call.disposition || call.status || '').toUpperCase();
+        // Critério técnico Adarco: Bilhetagem > 0 significa que houve atendimento real
+        const billablesec = Number(call.billablesec || 0);
+        const isAttended = disposition.includes('ANSWER') || disposition.includes('ATEND') || billablesec > 0;
+        const status = isAttended ? 'Atendida' : 'Perdida';
+
+        return {
+          timestamp: new Date(call.startDate || call.date || Date.now()).toISOString(),
+          status,
+          duration: billablesec, // Usamos o tempo de fala como duração principal
+          consultantName: consultant?.name,
+          team: consultant?.team,
+          extension: consultant?.extension || origin || destiny,
+          type: type as any
+        };
+      }).filter((d: any) => d.type !== ''); 
+
+      setData(processedData);
+    } catch (error: any) {
+      console.error("Erro na sincronização:", error);
+      setErrorMsg(error.message || "Erro ao conectar com a API de telefonia.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const triggerFileUpload = () => {
     setErrorMsg(null);
@@ -162,16 +284,19 @@ export default function App() {
             const mappingOrig = CONSULTANT_MAPPING[orig];
             const mappingDest = CONSULTANT_MAPPING[dest];
             
-            // Se nenhum dos dois for um ramal de consultor mapeado, descarta
+            // Log para debug de ramais ignorados
+            if (!mappingOrig && !mappingDest) {
+              console.log(`[CSV] Ramal ignorado: Orig=${orig}, Dest=${dest}`);
+            }
+
             const mapping = mappingOrig || mappingDest;
             if (!mapping) return null;
 
-            // O ramal identificado é aquele que encontramos no mapeamento
             const extensionIdentified = mappingOrig ? orig : dest;
 
             const timestampStr = row['Data'] || row['timestamp'] || '';
             let timestamp = new Date();
-            const formats = ['dd/MM/yyyy HH:mm:ss', 'yyyy-MM-dd HH:mm:ss', 'dd/MM/yyyy HH:mm', 'MM/dd/yyyy HH:mm:ss'];
+            const formats = ['yyyy-MM-dd HH:mm:ss', 'dd/MM/yyyy HH:mm:ss', 'dd/MM/yyyy HH:mm', 'MM/dd/yyyy HH:mm:ss'];
 
             for (const fmt of formats) {
               try {
@@ -183,25 +308,33 @@ export default function App() {
               } catch (e) {}
             }
 
-            const statusRaw = String(row['Status'] || row['status'] || '').toLowerCase();
-            const status = statusRaw.includes('atend') ? 'Atendida' : 'Perdida';
+            const bilhetagemRaw = row['Bilhetagem'] || row['billablesec'] || '0';
+            const bilhetagem = parseInt(bilhetagemRaw) || 0;
+
+            const statusRaw = String(row['Status'] || row['status'] || row['disposition'] || '').toUpperCase();
+            // Critério técnico Adarco: Bilhetagem > 0 significa que houve atendimento real
+            const isAttended = statusRaw.includes('ANSWER') || statusRaw.includes('ATEND') || bilhetagem > 0;
+            const status = isAttended ? 'Atendida' : 'Perdida';
             
             const typeRaw = String(row['Tipo'] || row['tipo'] || row['type'] || '').toLowerCase();
-            // Lógica robusta para detectar receptivas: keywords comuns em logs de PABX
-            const isReceptiva = typeRaw.includes('entr') || 
-                               typeRaw.includes('rec') || 
-                               typeRaw.includes('inbound') || 
-                               (mappingDest && !mappingOrig); // Heurística: se o destino é consultor e origem não, é receptiva
             
-            const type = isReceptiva ? 'Receptiva' : 'Ativa';
+            // Filtros solicitados: ignorar 'internal' e aceitar apenas 'sainte'/'outbound' ou 'entrante'/'inbound'
+            if (typeRaw.includes('internal')) return null;
 
-            const durationRaw = row['Duracao'] || row['Duração'] || row['duration'] || '0';
+            let type = '';
+            if (typeRaw.includes('sainte') || typeRaw.includes('outbound')) {
+              type = 'Ativa';
+            } else if (typeRaw.includes('entrante') || typeRaw.includes('inbound')) {
+              type = 'Receptiva';
+            } else {
+              return null;
+            }
 
             return {
               extension: extensionIdentified,
               type,
               status,
-              duration: parseInt(durationRaw) || 0,
+              duration: bilhetagem,
               timestamp: timestamp.toISOString(),
               consultantName: mapping.name,
               team: mapping.team
@@ -249,7 +382,7 @@ export default function App() {
         item.consultantName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         item.extension.includes(searchQuery);
       
-      const itemDate = item.timestamp.split('T')[0];
+      const itemDate = (item.timestamp || '').split('T')[0];
       const matchesStartDate = !startDate || itemDate >= startDate;
       const matchesEndDate = !endDate || itemDate <= endDate;
 
@@ -551,6 +684,24 @@ export default function App() {
                 ))}
              </div>
              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button 
+                    onClick={syncWithAPI}
+                    disabled={isSyncing}
+                    title="Sincronizar com API"
+                    className={cn(
+                      "p-3 bg-adarco-dark text-white rounded-2xl hover:bg-black transition-all shadow-soft flex items-center justify-center min-w-[48px] h-[48px]",
+                      isSyncing && "animate-spin"
+                    )}
+                >
+                    <TrendingUp className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={triggerFileUpload}
+                    title="Carregar CSV"
+                    className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-soft flex items-center justify-center min-w-[48px] h-[48px]"
+                >
+                    <Upload className="w-5 h-5" />
+                </button>
                 <div className="relative group flex-1 sm:flex-none">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 transition-colors group-focus-within:text-adarco-primary" />
                     <input 
@@ -579,7 +730,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
             >
-              <EmptyState onUpload={triggerFileUpload} />
+              <EmptyState onUpload={triggerFileUpload} onSync={syncWithAPI} isSyncing={isSyncing} />
               {errorMsg && (
                 <p className="mt-4 text-center text-sm font-bold text-red-500 bg-red-50 py-2 rounded-lg max-w-sm mx-auto">
                   {errorMsg}
@@ -735,32 +886,51 @@ export default function App() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  {teamComparison.map(team => (
-                    <div key={team.name} className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-700">{team.name}</span>
-                        <span className="text-sm font-bold text-slate-400">
-                          {team.success} / {team.total} <span className="text-[10px] ml-1 uppercase">Chamadas</span>
-                        </span>
+                  {teamComparison.map(team => {
+                    const pieData = [
+                      { name: 'Atendidas', value: team.success },
+                      { name: 'Perdidas', value: Math.max(0, team.total - team.success) }
+                    ];
+                    const color = team.name === TeamName.DEBORA ? "#064E3B" : "#00F58A";
+                    const efficiency = team.total > 0 ? ((team.success / team.total) * 100).toFixed(1) : 0;
+
+                    return (
+                      <div key={team.name} className="flex flex-col items-center">
+                        <div className="h-[220px] w-full relative">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={65}
+                                outerRadius={85}
+                                paddingAngle={5}
+                                dataKey="value"
+                                stroke="none"
+                              >
+                                <Cell fill={color} />
+                                <Cell fill="#F1F5F9" />
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span className="text-2xl font-black text-slate-800 leading-none">{efficiency}%</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Eficiência</span>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-center">
+                          <h4 className="font-extrabold text-slate-700 uppercase tracking-tight">{team.name}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs font-bold text-slate-400">
+                              {team.success} <span className="font-medium text-slate-300">atendidas de</span> {team.total}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${team.total > 0 ? (team.success / team.total) * 100 : 0}%` }}
-                          className={cn(
-                            "h-full rounded-full transition-all duration-1000",
-                            team.name === TeamName.DEBORA ? "bg-adarco-dark" : "bg-adarco-primary"
-                          )}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-slate-400">EFICIÊNCIA</span>
-                        <span className={team.name === TeamName.DEBORA ? "text-adarco-dark" : "text-adarco-primary"}>
-                          {team.total > 0 ? ((team.success / team.total) * 100).toFixed(1) : 0}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

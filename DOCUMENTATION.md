@@ -30,12 +30,19 @@ O **Dashboard Inside Sales ADARCO** é uma aplicação web moderna construída p
    - Efeito de brilho laminado no menu lateral.
    - Transições de estado animadas.
 
-## Estrutura de Dados
+## Estrutura de Dados e Lógica de Negócio
 O sistema espera um CSV com colunas comuns de logs de PABX, tais como:
 - `Data`: Timestamp da chamada.
 - `Origem` / `Destino`: Números ou ramais envolvidos.
 - `Status`: Indica se a chamada foi atendida ou perdida.
 - `Duração`: Tempo da chamada em segundos.
+- `Tipo`: Coluna essencial para a classificação das chamadas.
+
+### Filtragem de Tipos de Chamada
+Para garantir a precisão da análise de Inside Sales, o sistema aplica as seguintes regras estritas:
+- **Ativa**: Identificada quando o tipo é "Sainte".
+- **Receptiva**: Identificada quando o tipo é "Entrante".
+- **Excluídas**: Chamadas do tipo "Internal" ou qualquer outro tipo que não seja "Sainte" ou "Entrante" são automaticamente ignoradas pelo sistema.
 
 ## Otimizações de Código
 - **Memoização Estratégica**: Uso intensivo de `useMemo` para garantir que cálculos pesados e filtragens de grandes volumes de dados só ocorram quando necessário.
