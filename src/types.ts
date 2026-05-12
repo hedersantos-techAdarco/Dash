@@ -1,25 +1,37 @@
-export interface CallRecord {
-  id: string;
-  timestamp: Date;
+export enum TeamName {
+  DEBORA = "Time Débora",
+  MARILIA = "Time Marília"
+}
+
+export interface Consultant {
   extension: string;
-  agent: string;
-  duration: number; // in seconds
-  status: 'Atendida' | 'Perdida';
-  type: 'Origem' | 'Destino';
+  name: string;
+  team: TeamName;
 }
 
-export interface DashboardFilters {
-  dateRange: [Date | null, Date | null];
-  agent: string;
-  status: string;
-  type: string;
+export interface CallRecord {
+  extension: string;
+  type: string; // "Ativa", "Receptiva" etc
+  status: string; // "Atendida", "Não Atendida" etc
+  duration: number;
+  timestamp: string;
+  consultantName?: string;
+  team?: TeamName;
 }
 
-export interface KPIStats {
+export interface DashboardStats {
   totalCalls: number;
-  totalReceived: number;
-  totalMade: number;
-  tma: number; // Tempo Médio de Atendimento
+  successfulCalls: number;
   successRate: number;
-  lostRate: number;
+  consultantStats: {
+    name: string;
+    team: TeamName;
+    total: number;
+    successful: number;
+  }[];
+  teamStats: {
+    name: TeamName;
+    total: number;
+    successful: number;
+  }[];
 }

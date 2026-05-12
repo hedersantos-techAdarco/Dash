@@ -2,102 +2,115 @@ import React, { useState, useMemo } from 'react';
 import Papa from 'papaparse';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, Cell, PieChart, Pie, Legend
+  Cell, Legend, TooltipProps
 } from 'recharts';
 import { 
   Phone, PhoneCall, PhoneIncoming, PhoneOutgoing, 
-  Clock, TrendingUp, Filter, Upload, Download,
-  Users, CheckCircle2, XCircle, Search, Calendar
+  TrendingUp, Filter, Upload,
+  Users, CheckCircle2, XCircle, Search, Calendar,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, parse, startOfDay, endOfDay, isWithinInterval, subDays } from 'date-fns';
+import { parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { CallRecord, DashboardFilters, KPIStats } from './types.ts';
-import { cn, formatDuration, formatDateTime } from './lib/utils.ts';
+import { CallRecord, TeamName } from './types.ts';
+import { CONSULTANT_MAPPING } from './constants.ts';
+import { cn, formatDuration } from './lib/utils.ts';
 
 // --- Components ---
 
-const StatCard = ({ title, value, subtext, icon: Icon, trend }: any) => (
+const StatCard = ({ title, value, subtext, icon: Icon, trend, colorClass = "primary" }: any) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex items-start justify-between"
+    className={cn(
+      "bg-white p-6 rounded-2xl shadow-sm border flex items-start justify-between transition-all hover:shadow-md",
+      colorClass === "primary" ? "border-adarco-light" : "border-slate-100"
+    )}
   >
     <div>
       <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-emerald-900">{value}</h3>
+      <h3 className={cn(
+        "text-2xl font-bold font-mono tracking-tight",
+        colorClass === "primary" ? "text-adarco-dark" : "text-slate-900"
+      )}>{value}</h3>
       {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
-      {trend && (
+      {trend !== undefined && (
         <span className={cn(
           "inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full mt-2",
-          trend > 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+          trend >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
         )}>
-          {trend > 0 ? '+' : ''}{trend}%
+          {trend >= 0 ? '+' : ''}{trend}%
         </span>
       )}
     </div>
-    <div className="p-3 bg-emerald-50 rounded-xl">
-      <Icon className="w-6 h-6 text-emerald-600" />
+    <div className={cn(
+      "p-3 rounded-xl",
+      colorClass === "primary" ? "bg-adarco-soft" : "bg-slate-50"
+    )}>
+      <Icon className={cn(
+        "w-6 h-6",
+        colorClass === "primary" ? "text-adarco-primary" : "text-slate-400"
+      )} />
     </div>
   </motion.div>
 );
 
 const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-      <Phone className="w-10 h-10 text-emerald-600" />
+    <div className="w-20 h-20 bg-adarco-light/30 rounded-full flex items-center justify-center mb-6">
+      <Users className="w-10 h-10 text-adarco-dark" />
     </div>
-    <h2 className="text-2xl font-bold text-gray-900 mb-2">Bem-vindo ao Dashboard de Telefonia</h2>
+    <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard Inside Sales</h2>
     <p className="text-gray-500 max-w-md mb-8">
-      Carregue sua planilha de chamadas (CSV) para começar a analisar a performance da sua equipe.
+      Carregue o log de telefonia (CSV) para visualizar a performance dos times de <strong>Débora</strong> e <strong>Marília</strong>.
     </p>
     <button 
       onClick={onUpload}
-      className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95"
+      className="flex items-center gap-2 bg-adarco-dark hover:bg-black text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95"
     >
       <Upload size={20} />
-      Selecionar Relatório CSV
+      Carregar Relatório CSV
     </button>
   </div>
 );
+
+const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-lg">
+        <p className="text-sm font-bold text-gray-800 mb-1">{label}</p>
+        {payload.map((entry, index) => (
+          <div key={index} className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-gray-500">{entry.name}:</span>
+            <span className="font-bold text-gray-900">{entry.value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 // --- Main App ---
 
 export default function App() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
-
-  React.useEffect(() => {
-    fetch('/api/health')
-      .then(res => res.json())
-      .then(data => setServerStatus(data.status === 'ok' ? 'online' : 'offline'))
-      .catch(() => setServerStatus('offline'));
-  }, []);
-
-  const [isDragging, setIsDragging] = useState(false);
   const [data, setData] = useState<CallRecord[]>([]);
-  const [filters, setFilters] = useState<DashboardFilters>({
-    dateRange: [null, null],
-    agent: 'Todos',
-    status: 'Todos',
-    type: 'Todos'
-  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [selectedTeam, setSelectedTeam] = useState<string>('Todos');
+  const [selectedConsultant, setSelectedConsultant] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const triggerFileUpload = () => {
-    console.log("Triggering file upload click...");
     setErrorMsg(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    } else {
-      console.error("File input ref is null!");
-    }
+    fileInputRef.current?.click();
   };
 
   const processFile = (file: File) => {
-    console.log("Processing file:", file.name, file.size, file.type);
     setErrorMsg(null);
     Papa.parse(file, {
       header: true,
@@ -109,19 +122,15 @@ export default function App() {
         }
 
         const parsedData: CallRecord[] = results.data
-          .filter((row: any) => row['Data'] || row['Date'] || row['timestamp']) 
-          .map((row: any, index) => {
-            const timestampStr = row['Data'] || row['Date'] || row['timestamp'] || '';
-            let timestamp = new Date();
+          .map((row: any) => {
+            const extensionRaw = String(row['Origem'] || row['Ramal'] || row['Extension'] || '').trim();
+            const mapping = CONSULTANT_MAPPING[extensionRaw];
             
-            // Tentativa de parsing flexível
-            const formats = [
-              'yyyy-MM-dd HH:mm:ss',
-              'dd/MM/yyyy HH:mm:ss',
-              'dd/MM/yyyy HH:mm',
-              'MM/dd/yyyy HH:mm:ss',
-              'yyyy-MM-dd'
-            ];
+            if (!mapping) return null;
+
+            const timestampStr = row['Data'] || row['timestamp'] || '';
+            let timestamp = new Date();
+            const formats = ['dd/MM/yyyy HH:mm:ss', 'yyyy-MM-dd HH:mm:ss', 'dd/MM/yyyy HH:mm'];
 
             for (const fmt of formats) {
               try {
@@ -133,493 +142,481 @@ export default function App() {
               } catch (e) {}
             }
 
-            // Fallback para Date nativo se falhar
-            if (isNaN(timestamp.getTime())) {
-              timestamp = new Date(timestampStr);
-            }
+            const statusRaw = String(row['Status'] || row['status'] || '').toLowerCase();
+            const status = statusRaw.includes('atend') ? 'Atendida' : 'Perdida';
             
-            if (isNaN(timestamp.getTime())) {
-              timestamp = new Date();
-            }
+            const typeRaw = String(row['Tipo'] || row['tipo'] || row['type'] || '').toLowerCase();
+            const type = typeRaw.includes('entr') || typeRaw.includes('rec') ? 'Receptiva' : 'Ativa';
 
-            const extension = row['Origem'] || row['Source'] || row['Extension'] || 'N/A';
-            const fila = row['Fila'] || row['Queue'] || '';
-            const agent = fila ? `${fila} (${extension})` : `Ramal ${extension}`;
-            
-            const durationRaw = row['Duracao'] || row['Duração'] || row['Duration'] || '0';
-            
+            const durationRaw = row['Duracao'] || row['Duração'] || row['duration'] || '0';
+
             return {
-              id: index.toString(),
-              timestamp,
-              extension,
-              agent,
+              extension: extensionRaw,
+              type,
+              status,
               duration: parseInt(durationRaw) || 0,
-              status: (row['Status'] || '').toLowerCase().includes('atend') ? 'Atendida' : 'Perdida',
-              type: (row['Tipo'] || row['Type'] || '').toLowerCase().includes('entr') ? 'Destino' : 'Origem'
+              timestamp: timestamp.toISOString(),
+              consultantName: mapping.name,
+              team: mapping.team
             };
-          });
+          })
+          .filter((item): item is CallRecord => item !== null);
 
         if (parsedData.length > 0) {
           setData(parsedData);
+        } else {
+          setErrorMsg("Nenhum dado de Inside Sales (Débora/Marília) foi encontrado no arquivo.");
         }
       },
       error: (error) => {
-        console.error("Erro ao processar CSV:", error);
+        setErrorMsg("Erro ao processar CSV: " + error.message);
       }
     });
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-    processFile(file);
-    // Limpar o valor para permitir re-upload do mesmo arquivo
+    if (file) processFile(file);
     if (event.target) event.target.value = '';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+  const availableConsultants = useMemo(() => {
+    const baseList = Object.values(CONSULTANT_MAPPING);
+    if (selectedTeam === 'Todos') return ['Todos', ...Array.from(new Set(baseList.map(c => c.name)))].sort();
+    return ['Todos', ...baseList.filter(c => c.team === selectedTeam).map(c => c.name)].sort();
+  }, [selectedTeam]);
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type === "text/csv" || file.name.endsWith('.csv')) {
-      processFile(file);
-    }
-  };
-
-  const dashboardData = useMemo(() => {
+  const filteredData = useMemo(() => {
     return data.filter(item => {
-      const matchesAgent = filters.agent === 'Todos' || item.agent === filters.agent;
-      const matchesStatus = filters.status === 'Todos' || item.status === filters.status;
-      const matchesType = filters.type === 'Todos' || item.type === filters.type;
-      
-      let matchesRange = true;
-      if (filters.dateRange[0] && filters.dateRange[1]) {
-        matchesRange = isWithinInterval(item.timestamp, {
-          start: startOfDay(filters.dateRange[0]),
-          end: endOfDay(filters.dateRange[1])
-        });
-      }
-
+      const matchesTeam = selectedTeam === 'Todos' || item.team === selectedTeam;
+      const matchesConsultant = selectedConsultant === 'Todos' || item.consultantName === selectedConsultant;
       const matchesSearch = searchQuery === '' || 
-        item.agent.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        item.consultantName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         item.extension.includes(searchQuery);
 
-      return matchesAgent && matchesStatus && matchesType && matchesRange && matchesSearch;
+      return matchesTeam && matchesConsultant && matchesSearch;
     });
-  }, [data, filters, searchQuery]);
+  }, [data, selectedTeam, selectedConsultant, searchQuery]);
 
-  const stats = useMemo((): KPIStats => {
-    const total = dashboardData.length;
-    const handled = dashboardData.filter(d => d.status === 'Atendida');
-    const lost = dashboardData.filter(d => d.status === 'Perdida');
-    const incoming = dashboardData.filter(d => d.type === 'Destino');
-    const outgoing = dashboardData.filter(d => d.type === 'Origem');
+  const activeCallsByConsultant = useMemo(() => {
+    const counts: Record<string, { name: string, count: number, team: string }> = {};
+    const baseData = selectedTeam === 'Todos' ? data : data.filter(d => d.team === selectedTeam);
     
-    const totalDuration = handled.reduce((acc, curr) => acc + curr.duration, 0);
-    const tma = handled.length > 0 ? totalDuration / handled.length : 0;
+    Object.values(CONSULTANT_MAPPING).forEach(c => {
+       if (selectedTeam === 'Todos' || c.team === selectedTeam) {
+         counts[c.name] = { name: c.name, count: 0, team: c.team };
+       }
+    });
 
-    return {
-      totalCalls: total,
-      totalReceived: incoming.length,
-      totalMade: outgoing.length,
-      tma,
-      successRate: total > 0 ? (handled.length / total) * 100 : 0,
-      lostRate: total > 0 ? (lost.length / total) * 100 : 0
+    baseData.filter(d => d.type === 'Ativa').forEach(d => {
+      if (d.consultantName && counts[d.consultantName]) {
+        counts[d.consultantName].count++;
+      }
+    });
+
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [data, selectedTeam]);
+
+  const successCallsByConsultant = useMemo(() => {
+    const counts: Record<string, { name: string, count: number, team: string }> = {};
+    const baseData = selectedTeam === 'Todos' ? data : data.filter(d => d.team === selectedTeam);
+
+    Object.values(CONSULTANT_MAPPING).forEach(c => {
+       if (selectedTeam === 'Todos' || c.team === selectedTeam) {
+         counts[c.name] = { name: c.name, count: 0, team: c.team };
+       }
+    });
+
+    baseData.filter(d => d.status === 'Atendida').forEach(d => {
+      if (d.consultantName && counts[d.consultantName]) {
+        counts[d.consultantName].count++;
+      }
+    });
+
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [data, selectedTeam]);
+
+  const teamComparison = useMemo(() => {
+    const stats = {
+      [TeamName.DEBORA]: { name: TeamName.DEBORA, total: 0, success: 0 },
+      [TeamName.MARILIA]: { name: TeamName.MARILIA, total: 0, success: 0 }
     };
-  }, [dashboardData]);
-
-  const topAgents = useMemo(() => {
-    const counts: Record<string, number> = {};
-    dashboardData.forEach(d => {
-      counts[d.agent] = (counts[d.agent] || 0) + 1;
+    data.forEach(d => {
+      if (d.team && stats[d.team]) {
+        stats[d.team].total++;
+        if (d.status === 'Atendida') stats[d.team].success++;
+      }
     });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [dashboardData]);
-
-  const callsByDay = useMemo(() => {
-    const groups: Record<string, { date: string, count: number }> = {};
-    dashboardData.forEach(d => {
-      const day = format(d.timestamp, 'dd/MM', { locale: ptBR });
-      if (!groups[day]) groups[day] = { date: day, count: 0 };
-      groups[day].count++;
-    });
-    return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date));
-  }, [dashboardData]);
-
-  const durationDistribution = useMemo(() => {
-    const dist = [
-      { name: 'Curta (<1m)', count: 0 },
-      { name: 'Média (1-5m)', count: 0 },
-      { name: 'Longa (>5m)', count: 0 }
-    ];
-    dashboardData.filter(d => d.status === 'Atendida').forEach(d => {
-      if (d.duration < 60) dist[0].count++;
-      else if (d.duration < 300) dist[1].count++;
-      else dist[2].count++;
-    });
-    return dist;
-  }, [dashboardData]);
-
-  const agentsList = useMemo(() => {
-    return ['Todos', ...Array.from(new Set(data.map(d => d.agent)))].sort();
+    return Object.values(stats);
   }, [data]);
 
+  const kpis = useMemo(() => {
+    const total = filteredData.length;
+    const active = filteredData.filter(d => d.type === 'Ativa').length;
+    const success = filteredData.filter(d => d.status === 'Atendida').length;
+    const successRate = total > 0 ? (success / total) * 100 : 0;
+    
+    return { total, active, success, successRate };
+  }, [filteredData]);
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-emerald-900 text-white px-6 py-4 flex items-center justify-between shadow-lg sticky top-0 z-50">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-500 p-2 rounded-lg">
-              <PhoneCall className="w-5 h-5 text-white" />
+    <div className="min-h-screen bg-[#F8FAFC] flex text-slate-900 font-sans selection:bg-adarco-light selection:text-adarco-dark border-none">
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        accept=".csv" 
+        className="hidden" 
+        onChange={handleFileUpload} 
+      />
+
+      {/* Sidebar */}
+      <motion.aside 
+        initial={false}
+        animate={{ width: isSidebarOpen ? 280 : 0, opacity: isSidebarOpen ? 1 : 0 }}
+        className="bg-white border-r border-slate-200 overflow-hidden sticky top-0 h-screen hidden md:block"
+      >
+        <div className="p-6 w-[280px]">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-adarco-dark rounded-xl flex items-center justify-center shadow-lg shadow-adarco-light/50">
+              <PhoneCall className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Adarco</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-[10px] text-emerald-300 uppercase font-semibold tracking-widest">Inside Sales Performance</p>
-                <div className={cn(
-                  "w-1.5 h-1.5 rounded-full animate-pulse",
-                  serverStatus === 'online' ? "bg-emerald-400" : "bg-red-400"
-                )} />
-              </div>
+              <h1 className="font-bold text-lg tracking-tight">ADARCO</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">BI Telephony</p>
             </div>
           </div>
 
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          accept=".csv" 
-          className="hidden" 
-          onChange={handleFileUpload} 
-        />
+          <div className="space-y-8">
+            <div>
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">Dashboard</label>
+              <nav className="space-y-1">
+                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-adarco-soft text-adarco-dark font-semibold text-sm">
+                  <TrendingUp className="w-4 h-4" />
+                  Inside Sales
+                </button>
+              </nav>
+            </div>
 
-        {data.length > 0 && (
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
-              <input 
-                type="text" 
-                placeholder="Buscar agente ou ramal..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-emerald-800/50 border border-emerald-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all w-64"
-              />
-            </div>
-            <button 
-              onClick={triggerFileUpload}
-              className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 shadow-md active:scale-95"
-            >
-              <Upload size={16} />
-              <span>Novo Log</span>
-            </button>
-          </div>
-        )}
-      </header>
-
-      <main 
-        className={cn(
-          "flex-1 p-6 max-w-[1600px] mx-auto w-full transition-all duration-300",
-          isDragging && "bg-emerald-50 scale-[0.99] rounded-3xl"
-        )}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {isDragging && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-emerald-900/20 backdrop-blur-sm pointer-events-none">
-            <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-dashed border-emerald-500 flex flex-col items-center gap-4 animate-in zoom-in duration-300">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
-                <Upload className="w-8 h-8 text-emerald-600 animate-bounce" />
-              </div>
-              <p className="text-xl font-bold text-emerald-900">Solte para importar o CSV</p>
-            </div>
-          </div>
-        )}
-        {errorMsg && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-red-50 border border-red-100 text-red-700 rounded-xl flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <XCircle className="w-5 h-5" />
-              <p className="text-sm font-medium">{errorMsg}</p>
-            </div>
-            <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600 transition-colors">
-              <XCircle className="w-4 h-4" />
-            </button>
-          </motion.div>
-        )}
-        {data.length === 0 ? (
-          <EmptyState onUpload={triggerFileUpload} />
-        ) : (
-          <div className="space-y-6">
-            {/* Filters Row */}
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
-                <Filter size={16} className="text-emerald-600" />
-                <span className="text-sm font-semibold text-gray-700">Filtros:</span>
-              </div>
+            <div className="space-y-5">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Filtros</label>
               
-              <div className="flex flex-col">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Agente</label>
-                <select 
-                  className="bg-white border-none text-sm font-medium focus:ring-0 p-0 cursor-pointer"
-                  value={filters.agent}
-                  onChange={(e) => setFilters({...filters, agent: e.target.value})}
-                >
-                  {agentsList.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-
-              <div className="w-px h-8 bg-gray-100 hidden sm:block" />
-
-              <div className="flex flex-col">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Status</label>
-                <select 
-                  className="bg-white border-none text-sm font-medium focus:ring-0 p-0 cursor-pointer"
-                  value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
-                >
-                  <option value="Todos">Todos</option>
-                  <option value="Atendida">Atendidas</option>
-                  <option value="Perdida">Perdidas</option>
-                </select>
-              </div>
-
-              <div className="w-px h-8 bg-gray-100 hidden sm:block" />
-
-              <div className="flex flex-col">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Tipo</label>
-                <select 
-                  className="bg-white border-none text-sm font-medium focus:ring-0 p-0 cursor-pointer"
-                  value={filters.type}
-                  onChange={(e) => setFilters({...filters, type: e.target.value})}
-                >
-                  <option value="Todos">Todos</option>
-                  <option value="Origem">Originadas</option>
-                  <option value="Destino">Recebidas</option>
-                </select>
-              </div>
-
-              <button 
-                onClick={() => setFilters({
-                  dateRange: [null, null],
-                  agent: 'Todos',
-                  status: 'Todos',
-                  type: 'Todos'
-                })}
-                className="ml-auto text-xs font-bold text-emerald-600 hover:text-emerald-700 px-3 py-1 bg-emerald-50 rounded-full"
-              >
-                Limpar Filtros
-              </button>
-            </div>
-
-            {/* KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard 
-                title="Total de Chamadas" 
-                value={stats.totalCalls} 
-                subtext={`${stats.totalReceived} rec. / ${stats.totalMade} orig.`}
-                icon={Phone} 
-              />
-              <StatCard 
-                title="TMA (Média Atend.)" 
-                value={formatDuration(stats.tma)} 
-                subtext="Tempo total segmentado"
-                icon={Clock} 
-              />
-              <StatCard 
-                title="Taxa de Atendimento" 
-                value={`${stats.successRate.toFixed(1)}%`}
-                trend={stats.successRate > 80 ? 5 : -2}
-                icon={CheckCircle2} 
-              />
-              <StatCard 
-                title="Chamadas Perdidas" 
-                value={`${stats.lostRate.toFixed(1)}%`}
-                trend={stats.lostRate < 10 ? -12 : 8}
-                icon={XCircle} 
-              />
-            </div>
-
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Ranking Colunas */}
-              <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-emerald-600" />
-                    Ranking de Produtividade por Agente
-                  </h3>
-                </div>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={topAgents} layout="vertical" margin={{ left: 40, right: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" hide />
-                      <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        style={{ fontSize: '12px', fontWeight: 500, fill: '#64748b' }}
-                      />
-                      <Tooltip 
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      />
-                      <Bar dataKey="count" fill="#10b981" radius={[0, 4, 4, 0]} barSize={24} />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500">Supervisão / Time</p>
+                <div className="relative">
+                  <select 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-3 pr-8 text-sm font-medium appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    value={selectedTeam}
+                    onChange={(e) => {
+                      setSelectedTeam(e.target.value);
+                      setSelectedConsultant('Todos');
+                    }}
+                  >
+                    <option value="Todos">Todos os Times</option>
+                    <option value={TeamName.DEBORA}>Time Débora</option>
+                    <option value={TeamName.MARILIA}>Time Marília</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
-              {/* Distribuição Duração */}
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-emerald-600" />
-                  Perfil de Duração
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={durationDistribution}
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="count"
-                      >
-                        {[0, 1, 2].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#d1fae5', '#34d399', '#064e3b'][index]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      />
-                      <Legend verticalAlign="bottom" height={36}/>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Volume Temporal */}
-              <div className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-emerald-600" />
-                  Evolução do Volume de Chamadas
-                </h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={callsByDay}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="date" 
-                        axisLine={false} 
-                        tickLine={false}
-                        style={{ fontSize: '11px', fill: '#94a3b8' }} 
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false}
-                        style={{ fontSize: '11px', fill: '#94a3b8' }}
-                      />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="count" 
-                        stroke="#10b981" 
-                        strokeWidth={4} 
-                        dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
-                        activeDot={{ r: 6, strokeWidth: 0 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Detailed Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-6 border-bottom border-gray-100 flex items-center justify-between">
-                <h3 className="font-bold text-gray-800">Detalhamento de Chamadas</h3>
-                <span className="text-xs font-medium text-gray-400">{dashboardData.length} registros encontrados</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 border-y border-gray-100">
-                    <tr>
-                      <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Data / Hora</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Agente</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Ramal</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Duração</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</th>
-                      <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {dashboardData.slice(0, 50).map((call) => (
-                      <tr key={call.id} className="hover:bg-emerald-50/30 transition-colors">
-                        <td className="px-6 py-4 text-xs font-medium text-gray-600">{formatDateTime(call.timestamp)}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center text-[10px] font-bold text-emerald-700">
-                              {call.agent.substring(0, 2).toUpperCase()}
-                            </div>
-                            <span className="text-sm font-semibold text-gray-800">{call.agent}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 font-mono">{call.extension}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">{formatDuration(call.duration)}</td>
-                        <td className="px-6 py-4">
-                          <span className={cn(
-                            "px-2 py-1 rounded text-[10px] font-bold uppercase",
-                            call.type === 'Origem' ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
-                          )}>
-                            {call.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={cn(
-                            "inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold",
-                            call.status === 'Atendida' ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-                          )}>
-                            {call.status === 'Atendida' ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                            {call.status}
-                          </span>
-                        </td>
-                      </tr>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-500">Consultor</p>
+                <div className="relative">
+                  <select 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-3 pr-8 text-sm font-medium appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    value={selectedConsultant}
+                    onChange={(e) => setSelectedConsultant(e.target.value)}
+                  >
+                    {availableConsultants.map(c => (
+                      <option key={c} value={c}>{c}</option>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-              {dashboardData.length > 50 && (
-                <div className="p-4 bg-gray-50 text-center border-t border-gray-100">
-                  <p className="text-xs text-gray-400 italic">Mostrando os primeiros 50 registros. Use filtros para refinar os resultados.</p>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
-              )}
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <button 
+                  onClick={triggerFileUpload}
+                  className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95"
+                >
+                  <Upload className="w-4 h-4" />
+                  Atualizar Dados
+                </button>
+              </div>
             </div>
           </div>
-        )}
-      </main>
+        </div>
+      </motion.aside>
 
-      <footer className="bg-white border-t border-gray-100 py-6 px-6 text-center">
-        <p className="text-xs text-gray-400 font-medium">Dashboard Analytics • Telefonia BI & Performance</p>
-      </footer>
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto px-4 md:px-10 py-8">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Performance Inside Sales</h2>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="flex items-center gap-1 text-xs font-semibold text-slate-400">
+                <Calendar className="w-3 h-3" />
+                {data.length > 0 ? "Dados Ativos" : "Aguardando importação"}
+              </span>
+              <div className="w-1 h-1 bg-slate-300 rounded-full" />
+              <span className="text-[10px] font-bold text-adarco-dark bg-adarco-soft px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                Foco em Resultados
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+             <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input 
+                  type="text" 
+                  placeholder="Pesquisar..."
+                  className="bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-[200px] md:w-[280px] shadow-sm transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+             </div>
+             <button 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all shadow-sm md:hidden"
+             >
+                <Filter className="w-5 h-5" />
+             </button>
+          </div>
+        </header>
+
+        <AnimatePresence mode="wait">
+          {data.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <EmptyState onUpload={triggerFileUpload} />
+              {errorMsg && (
+                <p className="mt-4 text-center text-sm font-bold text-red-500 bg-red-50 py-2 rounded-lg max-w-sm mx-auto">
+                  {errorMsg}
+                </p>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="dashboard"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-8 pb-20"
+            >
+              {/* KPIs Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard 
+                  title="Total de Ligações" 
+                  value={kpis.total} 
+                  subtext="Volume bruto identificado"
+                  icon={Phone}
+                  colorClass="secondary"
+                />
+                <StatCard 
+                  title="Ligações Ativas" 
+                  value={kpis.active} 
+                  subtext="Prospecção direta"
+                  icon={PhoneOutgoing}
+                  colorClass="secondary"
+                />
+                <StatCard 
+                  title="Sucesso (Atendidas)" 
+                  value={kpis.success} 
+                  subtext="Contatos efetivos"
+                  icon={CheckCircle2}
+                  colorClass="primary"
+                />
+                <StatCard 
+                  title="Conversão de Contato" 
+                  value={`${kpis.successRate.toFixed(1)}%`}
+                  subtext="Taxa de sucesso global"
+                  icon={TrendingUp}
+                  trend={kpis.successRate > 70 ? 4 : -2}
+                  colorClass="primary"
+                />
+              </div>
+
+              {/* Central Charts Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Gráfico A */}
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">Volume de Ligações Ativas</h3>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Por Consultor</p>
+                    </div>
+                    <div className="p-3 bg-adarco-soft rounded-2xl">
+                      <PhoneOutgoing className="w-5 h-5 text-adarco-dark" />
+                    </div>
+                  </div>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={activeCallsByConsultant} 
+                        layout="vertical" 
+                        margin={{ left: 60, right: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                        <XAxis type="number" hide />
+                        <YAxis 
+                          dataKey="name" 
+                          type="category" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          style={{ fontSize: '12px', fontWeight: 600, fill: '#475569' }}
+                          width={100}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(20, 61, 45, 0.05)' }} />
+                        <Bar 
+                          dataKey="count" 
+                          name="Ligações Ativas"
+                          radius={[0, 8, 8, 0]} 
+                          barSize={32}
+                        >
+                           {activeCallsByConsultant.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.team === TeamName.DEBORA ? '#064E3B' : '#10B981'} />
+                           ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Gráfico B */}
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-lg">Chamadas Atendidas (Sucesso)</h3>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Contatos Efetivos</p>
+                    </div>
+                    <div className="p-3 bg-adarco-light/20 rounded-2xl">
+                      <CheckCircle2 className="w-5 h-5 text-adarco-primary" />
+                    </div>
+                  </div>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart 
+                        data={successCallsByConsultant} 
+                        layout="vertical" 
+                        margin={{ left: 60, right: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                        <XAxis type="number" hide />
+                        <YAxis 
+                          dataKey="name" 
+                          type="category" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          style={{ fontSize: '12px', fontWeight: 600, fill: '#475569' }}
+                          width={100}
+                        />
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(16, 185, 129, 0.05)' }} />
+                        <Bar 
+                          dataKey="count" 
+                          name="Contatos Efetivos"
+                          radius={[0, 8, 8, 0]} 
+                          barSize={32}
+                        >
+                           {successCallsByConsultant.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.team === TeamName.DEBORA ? '#065F46' : '#34D399'} />
+                           ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Comparativa */}
+              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="font-bold text-slate-800 text-lg">Performance Comparativa de Times</h3>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">Débora vs Marília</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  {teamComparison.map(team => (
+                    <div key={team.name} className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-700">{team.name}</span>
+                        <span className="text-sm font-bold text-slate-400">
+                          {team.success} / {team.total} <span className="text-[10px] ml-1 uppercase">Chamadas</span>
+                        </span>
+                      </div>
+                      <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${team.total > 0 ? (team.success / team.total) * 100 : 0}%` }}
+                          className={cn(
+                            "h-full rounded-full transition-all duration-1000",
+                            team.name === TeamName.DEBORA ? "bg-adarco-dark" : "bg-adarco-primary"
+                          )}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs font-bold">
+                        <span className="text-slate-400">EFICIÊNCIA</span>
+                        <span className={team.name === TeamName.DEBORA ? "text-adarco-dark" : "text-adarco-primary"}>
+                          {team.total > 0 ? ((team.success / team.total) * 100).toFixed(1) : 0}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                  <div>
+                    <h3 className="font-bold text-slate-800">Detalhamento por Consultor</h3>
+                    <p className="text-xs text-slate-400 font-medium">Filtro aplicado: {selectedTeam} / {selectedConsultant}</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-white border-b border-slate-100">
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Consultor</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Time</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ramal</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Duração</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredData.slice(0, 10).map((call, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm",
+                                call.team === TeamName.DEBORA ? "bg-adarco-dark text-white" : "bg-adarco-light text-adarco-dark"
+                              )}>
+                                {call.consultantName?.[0]}
+                              </div>
+                              <span className="text-sm font-bold text-slate-700">{call.consultantName}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-xs font-semibold text-slate-400">{call.team}</td>
+                          <td className="px-8 py-5 font-mono text-xs text-slate-500">{call.extension}</td>
+                          <td className="px-8 py-5 text-right font-mono text-sm font-semibold text-slate-600">
+                            {formatDuration(call.duration)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 }
