@@ -4,14 +4,19 @@
 @theme {
   --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   
-  --color-adarco-dark: #064E3B;
-  --color-adarco-primary: #10B981;
-  --color-adarco-light: #D1FAE5;
-  --color-adarco-soft: #F0FDF4;
+  --color-adarco-dark: #004D2C;
+  --color-adarco-primary: #00F58A;
+  --color-adarco-light: #CCDFD5;
+  --color-adarco-soft: #F1F8F4;
+  --color-graphite: #374151;
+  --color-offwhite: #F8F9FA;
+  
+  --shadow-soft: 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-neon: 0 0 15px rgba(0, 245, 138, 0.3);
 }
 
 @layer base {
   body {
-    @apply font-sans bg-gray-50 text-gray-900;
+    @apply font-sans bg-offwhite text-graphite antialiased;
   }
 }

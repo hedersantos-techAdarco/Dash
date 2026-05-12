@@ -2,13 +2,13 @@ import React, { useState, useMemo } from 'react';
 import Papa from 'papaparse';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Cell, Legend, TooltipProps
+  Cell, TooltipProps
 } from 'recharts';
 import { 
   Phone, PhoneCall, PhoneIncoming, PhoneOutgoing, 
   TrendingUp, Filter, Upload,
   Users, CheckCircle2, XCircle, Search, Calendar,
-  ChevronDown
+  ChevronDown, ArrowUpRight, ArrowDownRight, Menu, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { parse } from 'date-fns';
@@ -20,33 +20,49 @@ import { cn, formatDuration } from './lib/utils.ts';
 
 // --- Components ---
 
-const StatCard = ({ title, value, subtext, icon: Icon, trend, colorClass = "primary" }: any) => (
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  subtext?: string;
+  icon: React.ElementType;
+  trend?: number;
+  colorClass?: "primary" | "secondary";
+}
+
+const StatCard = ({ title, value, subtext, icon: Icon, trend, colorClass = "primary" }: StatCardProps) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
+    whileHover={{ y: -4, transition: { duration: 0.2 } }}
     animate={{ opacity: 1, y: 0 }}
     className={cn(
-      "bg-white p-6 rounded-2xl shadow-sm border flex items-start justify-between transition-all hover:shadow-md",
-      colorClass === "primary" ? "border-adarco-light" : "border-slate-100"
+      "bg-white/70 backdrop-blur-lg p-7 rounded-[1.25rem] shadow-soft border flex items-start justify-between transition-all hover:shadow-lg",
+      colorClass === "primary" ? "border-adarco-light/30" : "border-slate-100/50"
     )}
   >
-    <div>
-      <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-      <h3 className={cn(
-        "text-2xl font-bold font-mono tracking-tight",
-        colorClass === "primary" ? "text-adarco-dark" : "text-slate-900"
-      )}>{value}</h3>
-      {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
-      {trend !== undefined && (
-        <span className={cn(
-          "inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full mt-2",
-          trend >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
-        )}>
-          {trend >= 0 ? '+' : ''}{trend}%
-        </span>
-      )}
+    <div className="flex flex-col h-full justify-between">
+      <div>
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{title}</p>
+        <h3 className={cn(
+          "text-2xl md:text-3xl font-bold tracking-tight",
+          colorClass === "primary" ? "text-adarco-dark" : "text-slate-800"
+        )}>{value}</h3>
+      </div>
+      
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {trend !== undefined && (
+          <span className={cn(
+            "inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-lg",
+            trend >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+          )}>
+            {trend >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {Math.abs(trend)}%
+          </span>
+        )}
+        {subtext && <p className="text-[10px] font-semibold text-slate-400 uppercase">{subtext}</p>}
+      </div>
     </div>
     <div className={cn(
-      "p-3 rounded-xl",
+      "p-4 rounded-2xl",
       colorClass === "primary" ? "bg-adarco-soft" : "bg-slate-50"
     )}>
       <Icon className={cn(
@@ -59,12 +75,12 @@ const StatCard = ({ title, value, subtext, icon: Icon, trend, colorClass = "prim
 
 const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-    <div className="w-20 h-20 bg-adarco-light/30 rounded-full flex items-center justify-center mb-6">
-      <Users className="w-10 h-10 text-adarco-dark" />
+    <div className="w-16 h-16 md:w-20 md:h-20 bg-adarco-light/30 rounded-full flex items-center justify-center mb-6">
+      <Users className="w-8 h-8 md:w-10 md:h-10 text-adarco-dark" />
     </div>
-    <h2 className="text-2xl font-bold text-gray-900 mb-2">Dashboard Inside Sales</h2>
-    <p className="text-gray-500 max-w-md mb-8">
-      Carregue o log de telefonia (CSV) para visualizar a performance dos times de <strong>Débora</strong> e <strong>Marília</strong>.
+    <h2 className="text-2xl md:text-3xl font-black text-adarco-dark tracking-tighter mb-2 text-center md:text-left">Dashboard Inside Sales</h2>
+    <p className="text-slate-500 max-w-md mb-8 font-medium text-center md:text-left text-sm md:text-base">
+      Carregue o log de telefonia (CSV) para visualizar a performance dos <strong>Times do Inside Sales</strong>.
     </p>
     <button 
       onClick={onUpload}
@@ -76,7 +92,7 @@ const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
   </div>
 );
 
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white p-3 border border-gray-100 shadow-xl rounded-lg">
@@ -103,7 +119,23 @@ export default function App() {
   const [selectedTeam, setSelectedTeam] = useState<string>('Todos');
   const [selectedConsultant, setSelectedConsultant] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('Todos');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+    handleResize(); 
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const triggerFileUpload = () => {
     setErrorMsg(null);
@@ -123,14 +155,23 @@ export default function App() {
 
         const parsedData: CallRecord[] = results.data
           .map((row: any) => {
-            const extensionRaw = String(row['Origem'] || row['Ramal'] || row['Extension'] || '').trim();
-            const mapping = CONSULTANT_MAPPING[extensionRaw];
+            // Busca o ramal tanto na origem quanto no destino (comum em chamadas Receptivas)
+            const orig = String(row['Origem'] || row['Ramal'] || row['Extension'] || '').trim();
+            const dest = String(row['Destino'] || row['Destination'] || row['Número discado'] || row['Discado'] || '').trim();
             
+            const mappingOrig = CONSULTANT_MAPPING[orig];
+            const mappingDest = CONSULTANT_MAPPING[dest];
+            
+            // Se nenhum dos dois for um ramal de consultor mapeado, descarta
+            const mapping = mappingOrig || mappingDest;
             if (!mapping) return null;
+
+            // O ramal identificado é aquele que encontramos no mapeamento
+            const extensionIdentified = mappingOrig ? orig : dest;
 
             const timestampStr = row['Data'] || row['timestamp'] || '';
             let timestamp = new Date();
-            const formats = ['dd/MM/yyyy HH:mm:ss', 'yyyy-MM-dd HH:mm:ss', 'dd/MM/yyyy HH:mm'];
+            const formats = ['dd/MM/yyyy HH:mm:ss', 'yyyy-MM-dd HH:mm:ss', 'dd/MM/yyyy HH:mm', 'MM/dd/yyyy HH:mm:ss'];
 
             for (const fmt of formats) {
               try {
@@ -146,12 +187,18 @@ export default function App() {
             const status = statusRaw.includes('atend') ? 'Atendida' : 'Perdida';
             
             const typeRaw = String(row['Tipo'] || row['tipo'] || row['type'] || '').toLowerCase();
-            const type = typeRaw.includes('entr') || typeRaw.includes('rec') ? 'Receptiva' : 'Ativa';
+            // Lógica robusta para detectar receptivas: keywords comuns em logs de PABX
+            const isReceptiva = typeRaw.includes('entr') || 
+                               typeRaw.includes('rec') || 
+                               typeRaw.includes('inbound') || 
+                               (mappingDest && !mappingOrig); // Heurística: se o destino é consultor e origem não, é receptiva
+            
+            const type = isReceptiva ? 'Receptiva' : 'Ativa';
 
             const durationRaw = row['Duracao'] || row['Duração'] || row['duration'] || '0';
 
             return {
-              extension: extensionRaw,
+              extension: extensionIdentified,
               type,
               status,
               duration: parseInt(durationRaw) || 0,
@@ -164,6 +211,13 @@ export default function App() {
 
         if (parsedData.length > 0) {
           setData(parsedData);
+          
+          // Set initial date range
+          const dates = parsedData.map(d => new Date(d.timestamp).getTime());
+          const minDate = new Date(Math.min(...dates)).toISOString().split('T')[0];
+          const maxDate = new Date(Math.max(...dates)).toISOString().split('T')[0];
+          setStartDate(minDate);
+          setEndDate(maxDate);
         } else {
           setErrorMsg("Nenhum dado de Inside Sales (Débora/Marília) foi encontrado no arquivo.");
         }
@@ -190,77 +244,122 @@ export default function App() {
     return data.filter(item => {
       const matchesTeam = selectedTeam === 'Todos' || item.team === selectedTeam;
       const matchesConsultant = selectedConsultant === 'Todos' || item.consultantName === selectedConsultant;
+      const matchesType = selectedType === 'Todos' || item.type === selectedType;
       const matchesSearch = searchQuery === '' || 
         item.consultantName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         item.extension.includes(searchQuery);
+      
+      const itemDate = item.timestamp.split('T')[0];
+      const matchesStartDate = !startDate || itemDate >= startDate;
+      const matchesEndDate = !endDate || itemDate <= endDate;
 
-      return matchesTeam && matchesConsultant && matchesSearch;
+      return matchesTeam && matchesConsultant && matchesType && matchesSearch && matchesStartDate && matchesEndDate;
     });
-  }, [data, selectedTeam, selectedConsultant, searchQuery]);
+  }, [data, selectedTeam, selectedConsultant, selectedType, searchQuery, startDate, endDate]);
 
-  const activeCallsByConsultant = useMemo(() => {
-    const counts: Record<string, { name: string, count: number, team: string }> = {};
-    const baseData = selectedTeam === 'Todos' ? data : data.filter(d => d.team === selectedTeam);
-    
+  const dashboardStats = useMemo(() => {
+    const activeCounts: Record<string, { name: string, count: number, team: string }> = {};
+    const successCounts: Record<string, { name: string, count: number, team: string }> = {};
+    const summary: Record<string, { 
+      name: string, 
+      team: TeamName, 
+      extension: string,
+      total: number, 
+      success: number, 
+      totalDuration: number 
+    }> = {};
+
+    // Initialize counts for all consultants in selected team
     Object.values(CONSULTANT_MAPPING).forEach(c => {
-       if (selectedTeam === 'Todos' || c.team === selectedTeam) {
-         counts[c.name] = { name: c.name, count: 0, team: c.team };
-       }
-    });
-
-    baseData.filter(d => d.type === 'Ativa').forEach(d => {
-      if (d.consultantName && counts[d.consultantName]) {
-        counts[d.consultantName].count++;
+      if (selectedTeam === 'Todos' || c.team === selectedTeam) {
+        activeCounts[c.name] = { name: c.name, count: 0, team: c.team };
+        successCounts[c.name] = { name: c.name, count: 0, team: c.team };
       }
     });
 
-    return Object.values(counts).sort((a, b) => b.count - a.count);
-  }, [data, selectedTeam]);
+    let activeCountTotal = 0;
+    let successCountTotal = 0;
 
-  const successCallsByConsultant = useMemo(() => {
-    const counts: Record<string, { name: string, count: number, team: string }> = {};
-    const baseData = selectedTeam === 'Todos' ? data : data.filter(d => d.team === selectedTeam);
+    filteredData.forEach(call => {
+      const { consultantName, type, status, duration, team, extension } = call;
+      if (!consultantName) return;
 
-    Object.values(CONSULTANT_MAPPING).forEach(c => {
-       if (selectedTeam === 'Todos' || c.team === selectedTeam) {
-         counts[c.name] = { name: c.name, count: 0, team: c.team };
-       }
-    });
+      // Update active/success counts if consultant is in the selected set
+      if (activeCounts[consultantName]) {
+        if (type === 'Ativa') {
+          activeCounts[consultantName].count++;
+        }
+      }
+      if (successCounts[consultantName]) {
+        if (status === 'Atendida') {
+          successCounts[consultantName].count++;
+        }
+      }
 
-    baseData.filter(d => d.status === 'Atendida').forEach(d => {
-      if (d.consultantName && counts[d.consultantName]) {
-        counts[d.consultantName].count++;
+      // Update global KPI counters
+      if (type === 'Ativa') activeCountTotal++;
+      if (status === 'Atendida') successCountTotal++;
+
+      // Update Summary table data
+      if (!summary[consultantName]) {
+        summary[consultantName] = {
+          name: consultantName,
+          team: team as TeamName,
+          extension: extension,
+          total: 0,
+          success: 0,
+          totalDuration: 0
+        };
+      }
+      const s = summary[consultantName];
+      s.total++;
+      if (status === 'Atendida') {
+        s.success++;
+        s.totalDuration += duration;
       }
     });
 
-    return Object.values(counts).sort((a, b) => b.count - a.count);
-  }, [data, selectedTeam]);
+    const activeCallsByConsultant = Object.values(activeCounts).sort((a, b) => b.count - a.count);
+    const successCallsByConsultant = Object.values(successCounts).sort((a, b) => b.count - a.count);
+    const consultantSummary = Object.values(summary).map(s => ({
+      ...s,
+      tma: s.success > 0 ? Math.round(s.totalDuration / s.success) : 0
+    })).sort((a, b) => b.total - a.total);
+
+    const total = filteredData.length;
+    const successRate = total > 0 ? (successCountTotal / total) * 100 : 0;
+
+    return {
+      activeCallsByConsultant,
+      successCallsByConsultant,
+      consultantSummary,
+      kpis: {
+        total,
+        active: activeCountTotal,
+        success: successCountTotal,
+        successRate
+      }
+    };
+  }, [filteredData, selectedTeam]);
+
+  const { activeCallsByConsultant, successCallsByConsultant, consultantSummary, kpis } = dashboardStats;
 
   const teamComparison = useMemo(() => {
-    const stats = {
+    const statsArr = {
       [TeamName.DEBORA]: { name: TeamName.DEBORA, total: 0, success: 0 },
       [TeamName.MARILIA]: { name: TeamName.MARILIA, total: 0, success: 0 }
     };
     data.forEach(d => {
-      if (d.team && stats[d.team]) {
-        stats[d.team].total++;
-        if (d.status === 'Atendida') stats[d.team].success++;
+      if (d.team && statsArr[d.team]) {
+        statsArr[d.team].total++;
+        if (d.status === 'Atendida') statsArr[d.team].success++;
       }
     });
-    return Object.values(stats);
+    return Object.values(statsArr);
   }, [data]);
 
-  const kpis = useMemo(() => {
-    const total = filteredData.length;
-    const active = filteredData.filter(d => d.type === 'Ativa').length;
-    const success = filteredData.filter(d => d.status === 'Atendida').length;
-    const successRate = total > 0 ? (success / total) * 100 : 0;
-    
-    return { total, active, success, successRate };
-  }, [filteredData]);
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex text-slate-900 font-sans selection:bg-adarco-light selection:text-adarco-dark border-none">
+    <div className="min-h-screen bg-offwhite flex text-graphite font-sans selection:bg-adarco-light selection:text-adarco-dark border-none">
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -269,80 +368,148 @@ export default function App() {
         onChange={handleFileUpload} 
       />
 
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsSidebarOpen(false)}
+            className="fixed inset-0 bg-adarco-dark/60 backdrop-blur-sm z-30 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 280 : 0, opacity: isSidebarOpen ? 1 : 0 }}
-        className="bg-white border-r border-slate-200 overflow-hidden sticky top-0 h-screen hidden md:block"
+        animate={{ 
+          width: isSidebarOpen ? 300 : 0, 
+          x: isSidebarOpen ? 0 : -300,
+          opacity: 1
+        }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className={cn(
+          "bg-gradient-to-b from-[#00F58A]/40 via-[#004D2C]/90 to-[#003B22] text-white shadow-2xl z-40 sticky top-0 h-screen backdrop-blur-3xl border-r border-white/20 relative overflow-hidden",
+          "fixed inset-y-0 left-0 md:sticky transition-width duration-300"
+        )}
       >
-        <div className="p-6 w-[280px]">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-adarco-dark rounded-xl flex items-center justify-center shadow-lg shadow-adarco-light/50">
-              <PhoneCall className="w-6 h-6 text-white" />
+        {/* Close button for mobile inside sidebar */}
+        <button 
+          onClick={() => setIsSidebarOpen(false)}
+          className="absolute top-4 right-4 p-2 bg-white/10 rounded-lg md:hidden z-50"
+        >
+          <X className="w-5 h-5 text-white" />
+        </button>
+
+        {/* Laminated Effect Shine */}
+        <div className="absolute top-0 left-0 right-0 h-[300px] bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+        
+        <div className="relative p-8 w-[300px] h-full flex flex-col z-10">
+          <div className="flex items-center gap-4 mb-12">
+            <div className="w-12 h-12 bg-white/20 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/30 shadow-xl relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <PhoneCall className="w-7 h-7 text-white" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg tracking-tight">ADARCO</h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">BI Telephony</p>
+            <div 
+              onClick={() => {
+                setData([]);
+                setErrorMsg(null);
+                setSelectedTeam('Todos');
+                setSelectedConsultant('Todos');
+                setSelectedType('Todos');
+                setSearchQuery('');
+                setStartDate('');
+                setEndDate('');
+              }}
+              className="cursor-pointer group select-none"
+            >
+              <h1 className="font-black text-xl tracking-tighter text-white drop-shadow-sm group-hover:text-adarco-primary transition-colors">ADARCO</h1>
+              <p className="text-[10px] text-white/60 font-black uppercase tracking-widest leading-none mt-1">Inside Sales BI</p>
             </div>
           </div>
 
-          <div className="space-y-8">
+          <div className="flex-1 space-y-10">
             <div>
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4 block">Dashboard</label>
-              <nav className="space-y-1">
-                <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-adarco-soft text-adarco-dark font-semibold text-sm">
-                  <TrendingUp className="w-4 h-4" />
+              <label className="text-[11px] font-black text-white/50 uppercase tracking-[0.2em] mb-4 block drop-shadow-sm">Navigation</label>
+              <nav className="space-y-2">
+                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/10 text-white font-bold text-sm border border-white/20 shadow-inner backdrop-blur-md">
+                  <TrendingUp className="w-4 h-4 text-white" />
                   Inside Sales
                 </button>
               </nav>
             </div>
 
-            <div className="space-y-5">
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Filtros</label>
+            <div className="space-y-6">
+              <label className="text-[11px] font-black text-white/50 uppercase tracking-[0.2em] block drop-shadow-sm">Data Filters</label>
               
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500">Supervisão / Time</p>
+                <p className="text-xs font-bold text-white/70 pl-1">Supervisão</p>
                 <div className="relative">
                   <select 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-3 pr-8 text-sm font-medium appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-4 pr-10 text-sm font-bold appearance-none focus:ring-2 focus:ring-white/20 focus:bg-[#004D2C] outline-none transition-all cursor-pointer text-white backdrop-blur-xl"
                     value={selectedTeam}
                     onChange={(e) => {
                       setSelectedTeam(e.target.value);
                       setSelectedConsultant('Todos');
                     }}
                   >
-                    <option value="Todos">Todos os Times</option>
-                    <option value={TeamName.DEBORA}>Time Débora</option>
-                    <option value={TeamName.MARILIA}>Time Marília</option>
+                    <option className="bg-[#004D2C]" value="Todos">Todos os Times</option>
+                    <option className="bg-[#004D2C]" value={TeamName.DEBORA}>Time Débora</option>
+                    <option className="bg-[#004D2C]" value={TeamName.MARILIA}>Time Marília</option>
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500">Consultor</p>
+                <p className="text-xs font-bold text-white/70 pl-1">Consultor</p>
                 <div className="relative">
                   <select 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-3 pr-8 text-sm font-medium appearance-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-4 pr-10 text-sm font-bold appearance-none focus:ring-2 focus:ring-white/20 focus:bg-[#004D2C] outline-none transition-all cursor-pointer text-white backdrop-blur-xl"
                     value={selectedConsultant}
                     onChange={(e) => setSelectedConsultant(e.target.value)}
                   >
+                    <option className="bg-[#004D2C]" value="Todos">Todos os Consultores</option>
                     {availableConsultants.map(c => (
-                      <option key={c} value={c}>{c}</option>
+                      <option key={c} className="bg-[#004D2C]" value={c}>{c}</option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <button 
-                  onClick={triggerFileUpload}
-                  className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl text-sm font-bold transition-all shadow-md active:scale-95"
-                >
-                  <Upload className="w-4 h-4" />
-                  Atualizar Dados
-                </button>
+              <div className="space-y-3 pt-6 border-t border-white/20">
+                <p className="text-xs font-bold text-white/80 pl-1 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-white" /> Período Temporal
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  <input 
+                    type="date"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-white/20 outline-none text-white color-scheme-dark shadow-inner"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <input 
+                    type="date"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-xs font-bold focus:ring-2 focus:ring-white/20 outline-none text-white color-scheme-dark shadow-inner"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-white/10 mt-auto opacity-40 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <Users className="w-4 h-4 text-adarco-light" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-white/60 uppercase tracking-tighter">Powered by</p>
+                <p className="text-xs font-black text-white tracking-tight">Inside Sales BI</p>
               </div>
             </div>
           </div>
@@ -351,38 +518,56 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 md:px-10 py-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-12">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Performance Inside Sales</h2>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="flex items-center gap-1 text-xs font-semibold text-slate-400">
-                <Calendar className="w-3 h-3" />
-                {data.length > 0 ? "Dados Ativos" : "Aguardando importação"}
+            <h2 className="text-2xl md:text-3xl font-black tracking-tighter text-adarco-dark">Performance Inside Sales</h2>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="flex items-center gap-1 text-xs font-bold text-slate-400 uppercase tracking-tight">
+                <Calendar className="w-3.5 h-3.5" />
+                {data.length > 0 ? "Dados Ativos" : "Aguardando Importação"}
               </span>
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-              <span className="text-[10px] font-bold text-adarco-dark bg-adarco-soft px-2 py-0.5 rounded-full uppercase tracking-tighter">
+              <div className="w-1.5 h-1.5 bg-adarco-light rounded-full shadow-sm" />
+              <span className="text-[10px] font-black text-white bg-adarco-primary px-3 py-1 rounded-lg uppercase tracking-widest shadow-sm">
                 Foco em Resultados
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input 
-                  type="text" 
-                  placeholder="Pesquisar..."
-                  className="bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-[200px] md:w-[280px] shadow-sm transition-all"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:w-auto">
+             <div className="flex bg-white/60 backdrop-blur-md border border-white/50 shadow-soft rounded-2xl p-1.5 w-full sm:w-auto overflow-x-auto no-scrollbar">
+                {['Todos', 'Ativa', 'Receptiva'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedType(type)}
+                    className={cn(
+                      "flex-1 sm:flex-none px-4 md:px-5 py-2 text-[11px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap",
+                      selectedType === type 
+                        ? "bg-adarco-dark text-white shadow-lg" 
+                        : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+                    )}
+                  >
+                    {type}
+                  </button>
+                ))}
              </div>
-             <button 
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all shadow-sm md:hidden"
-             >
-                <Filter className="w-5 h-5" />
-             </button>
+             <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative group flex-1 sm:flex-none">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 transition-colors group-focus-within:text-adarco-primary" />
+                    <input 
+                      type="text" 
+                      placeholder="Pesquisar consultor..."
+                      className="bg-white/80 backdrop-blur-md border border-white/50 rounded-2xl pl-11 pr-5 py-3 text-sm font-bold focus:ring-4 focus:ring-adarco-primary/20 focus:border-adarco-primary outline-none w-full sm:w-[200px] md:w-[320px] shadow-neon transition-all placeholder:text-slate-400"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <button 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-soft md:hidden flex items-center justify-center min-w-[48px] h-[48px]"
+                >
+                    {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
+             </div>
           </div>
         </header>
 
@@ -432,7 +617,7 @@ export default function App() {
                   colorClass="primary"
                 />
                 <StatCard 
-                  title="Conversão de Contato" 
+                  title="Efetividade de Contato" 
                   value={`${kpis.successRate.toFixed(1)}%`}
                   subtext="Taxa de sucesso global"
                   icon={TrendingUp}
@@ -444,7 +629,7 @@ export default function App() {
               {/* Central Charts Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Gráfico A */}
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div className="bg-white/70 backdrop-blur-lg p-8 rounded-3xl shadow-soft border border-white/40">
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg">Volume de Ligações Ativas</h3>
@@ -454,7 +639,7 @@ export default function App() {
                       <PhoneOutgoing className="w-5 h-5 text-adarco-dark" />
                     </div>
                   </div>
-                  <div className="h-[400px]">
+                  <div className="h-[300px] md:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={activeCallsByConsultant} 
@@ -488,7 +673,7 @@ export default function App() {
                 </div>
 
                 {/* Gráfico B */}
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div className="bg-white/70 backdrop-blur-lg p-8 rounded-3xl shadow-soft border border-white/40">
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <h3 className="font-bold text-slate-800 text-lg">Chamadas Atendidas (Sucesso)</h3>
@@ -498,7 +683,7 @@ export default function App() {
                       <CheckCircle2 className="w-5 h-5 text-adarco-primary" />
                     </div>
                   </div>
-                  <div className="h-[400px]">
+                  <div className="h-[300px] md:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart 
                         data={successCallsByConsultant} 
@@ -522,9 +707,18 @@ export default function App() {
                           radius={[0, 8, 8, 0]} 
                           barSize={32}
                         >
-                           {successCallsByConsultant.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.team === TeamName.DEBORA ? '#065F46' : '#34D399'} />
-                           ))}
+                           {successCallsByConsultant.map((entry, index) => {
+                             // Lógica Visual: Verde para quem está acima da meta (ex: > 10 chamadas)
+                             // ou uma cor mais neutra para quem está abaixo
+                             const isHighPerformance = entry.count > 10; 
+                             return (
+                               <Cell 
+                                 key={`cell-${index}`} 
+                                 fill={isHighPerformance ? '#004D2C' : '#94A3B8'} 
+                                 fillOpacity={isHighPerformance ? 1 : 0.6}
+                               />
+                             );
+                           })}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -533,7 +727,7 @@ export default function App() {
               </div>
 
               {/* Performance Comparativa */}
-              <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+              <div className="bg-white/70 backdrop-blur-lg p-8 rounded-3xl shadow-soft border border-white/40">
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h3 className="font-bold text-slate-800 text-lg">Performance Comparativa de Times</h3>
@@ -571,11 +765,11 @@ export default function App() {
               </div>
 
               {/* Table */}
-              <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+              <div className="bg-white/70 backdrop-blur-lg rounded-[2rem] shadow-soft border border-white/40 overflow-hidden">
+                <div className="p-8 border-b border-slate-100/50 flex items-center justify-between bg-white/40">
                   <div>
-                    <h3 className="font-bold text-slate-800">Detalhamento por Consultor</h3>
-                    <p className="text-xs text-slate-400 font-medium">Filtro aplicado: {selectedTeam} / {selectedConsultant}</p>
+                    <h3 className="font-bold text-slate-800">Resumo de Performance</h3>
+                    <p className="text-xs text-slate-400 font-medium">Métricas consolidadas por consultor no período</p>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -583,29 +777,50 @@ export default function App() {
                     <thead>
                       <tr className="bg-white border-b border-slate-100">
                         <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Consultor</th>
-                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Time</th>
-                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Ramal</th>
-                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Duração</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Ligações</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Sucesso</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Efet. %</th>
+                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">TMA</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredData.slice(0, 10).map((call, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      {consultantSummary.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="px-8 py-5">
                             <div className="flex items-center gap-3">
                               <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm",
-                                call.team === TeamName.DEBORA ? "bg-adarco-dark text-white" : "bg-adarco-light text-adarco-dark"
+                                "w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm transition-transform group-hover:scale-110",
+                                item.team === TeamName.DEBORA ? "bg-adarco-dark text-white" : "bg-adarco-light text-adarco-dark"
                               )}>
-                                {call.consultantName?.[0]}
+                                {item.name[0]}
                               </div>
-                              <span className="text-sm font-bold text-slate-700">{call.consultantName}</span>
+                              <div>
+                                <p className="text-sm font-bold text-slate-700">{item.name}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">{item.team}</p>
+                              </div>
                             </div>
                           </td>
-                          <td className="px-8 py-5 text-xs font-semibold text-slate-400">{call.team}</td>
-                          <td className="px-8 py-5 font-mono text-xs text-slate-500">{call.extension}</td>
-                          <td className="px-8 py-5 text-right font-mono text-sm font-semibold text-slate-600">
-                            {formatDuration(call.duration)}
+                          <td className="px-8 py-5 text-center font-mono text-sm font-bold text-slate-600">{item.total}</td>
+                          <td className="px-8 py-5 text-center">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold font-mono">
+                              {item.success}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-xs font-bold text-slate-600">
+                                {item.total > 0 ? ((item.success / item.total) * 100).toFixed(0) : 0}%
+                              </span>
+                              <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-adarco-primary rounded-full" 
+                                  style={{ width: `${item.total > 0 ? (item.success / item.total) * 100 : 0}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-right font-mono text-sm font-extrabold text-adarco-dark">
+                            {formatDuration(item.tma)}
                           </td>
                         </tr>
                       ))}
