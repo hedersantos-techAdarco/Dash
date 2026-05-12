@@ -81,32 +81,37 @@ export default function App() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      delimiter: ";", // Explicitly supporting the semicolon format from the sample
       complete: (results) => {
-        const parsedData: CallRecord[] = results.data.map((row: any, index) => {
-          // Normalizing columns based on requested names or defaults
-          // [Data/Hora], [Ramal], [Agente], [Duração], [Status da Chamada: Atendida/Perdida], [Tipo: Origem/Destino]
-          const timestampStr = row['Data/Hora'] || row['Data'] || '';
-          let timestamp = new Date();
-          try {
-             // Assuming format could be DD/MM/YYYY HH:mm:ss or similar
-             timestamp = parse(timestampStr, 'dd/MM/yyyy HH:mm:ss', new Date());
-             if (isNaN(timestamp.getTime())) {
+        const parsedData: CallRecord[] = results.data
+          .filter((row: any) => row['Data']) // Ensure valid row
+          .map((row: any, index) => {
+            const timestampStr = row['Data'] || '';
+            let timestamp = new Date();
+            try {
+              // Try standard format YYYY-MM-DD HH:mm:ss from sample
+              timestamp = parse(timestampStr, 'yyyy-MM-dd HH:mm:ss', new Date());
+              if (isNaN(timestamp.getTime())) {
                 timestamp = new Date(timestampStr);
-             }
-          } catch (e) {
-             timestamp = new Date();
-          }
+              }
+            } catch (e) {
+              timestamp = new Date();
+            }
 
-          return {
-            id: index.toString(),
-            timestamp,
-            extension: row['Ramal'] || '',
-            agent: row['Agente'] || row['Atendente'] || 'Desconhecido',
-            duration: parseInt(row['Duração']) || 0,
-            status: (row['Status da Chamada'] || row['Status']) === 'Perdida' ? 'Perdida' : 'Atendida',
-            type: (row['Tipo'] || '').includes('Origem') ? 'Origem' : 'Destino'
-          };
-        });
+            // In the provided sample, Origem is often the extension for Sainte calls
+            const extension = row['Origem'] || 'N/A';
+            const agent = `Ramal ${extension}`;
+            
+            return {
+              id: index.toString(),
+              timestamp,
+              extension,
+              agent,
+              duration: parseInt(row['Duracao'] || row['Duração']) || 0,
+              status: row['Status'] === 'Atendida' ? 'Atendida' : 'Perdida',
+              type: row['Tipo'] === 'Entrante' ? 'Destino' : 'Origem'
+            };
+          });
         setData(parsedData);
       }
     });
