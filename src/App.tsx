@@ -65,6 +65,7 @@ const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
 // --- Main App ---
 
 export default function App() {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [data, setData] = useState<CallRecord[]>([]);
   const [filters, setFilters] = useState<DashboardFilters>({
     dateRange: [null, null],
@@ -74,6 +75,10 @@ export default function App() {
   });
   const [searchQuery, setSearchQuery] = useState('');
 
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -81,15 +86,14 @@ export default function App() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      delimiter: ";", // Explicitly supporting the semicolon format from the sample
+      delimiter: ";", // Suporte ao formato de ponto e vírgula do sample
       complete: (results) => {
         const parsedData: CallRecord[] = results.data
-          .filter((row: any) => row['Data']) // Ensure valid row
+          .filter((row: any) => row['Data']) // Garante linha válida
           .map((row: any, index) => {
             const timestampStr = row['Data'] || '';
             let timestamp = new Date();
             try {
-              // Try standard format YYYY-MM-DD HH:mm:ss from sample
               timestamp = parse(timestampStr, 'yyyy-MM-dd HH:mm:ss', new Date());
               if (isNaN(timestamp.getTime())) {
                 timestamp = new Date(timestampStr);
@@ -98,9 +102,8 @@ export default function App() {
               timestamp = new Date();
             }
 
-            // In the provided sample, Origem is often the extension for Sainte calls
             const extension = row['Origem'] || 'N/A';
-            const agent = `Ramal ${extension}`;
+            const agent = row['Fila'] ? `${row['Fila']} (${extension})` : `Ramal ${extension}`;
             
             return {
               id: index.toString(),
@@ -212,6 +215,14 @@ export default function App() {
           </div>
         </div>
 
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          accept=".csv" 
+          className="hidden" 
+          onChange={handleFileUpload} 
+        />
+
         {data.length > 0 && (
           <div className="flex items-center gap-4">
             <div className="hidden md:flex relative">
@@ -224,18 +235,20 @@ export default function App() {
                 className="bg-emerald-800/50 border border-emerald-700 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all w-64"
               />
             </div>
-            <label className="cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2">
+            <button 
+              onClick={triggerFileUpload}
+              className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 shadow-md active:scale-95"
+            >
               <Upload size={16} />
               <span>Novo Log</span>
-              <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
-            </label>
+            </button>
           </div>
         )}
       </header>
 
       <main className="flex-1 p-6 max-w-[1600px] mx-auto w-full">
         {data.length === 0 ? (
-          <EmptyState onUpload={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()} />
+          <EmptyState onUpload={triggerFileUpload} />
         ) : (
           <div className="space-y-6">
             {/* Filters Row */}
