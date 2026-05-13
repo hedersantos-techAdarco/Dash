@@ -8,7 +8,8 @@ import {
   Phone, PhoneCall, PhoneIncoming, PhoneOutgoing, 
   TrendingUp, Filter, Upload,
   Users, CheckCircle2, XCircle, Search, Calendar,
-  ChevronDown, ArrowUpRight, ArrowDownRight, Menu, X
+  ChevronDown, ArrowUpRight, ArrowDownRight, Menu, X,
+  Loader2, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { parse } from 'date-fns';
@@ -85,13 +86,9 @@ const EmptyState = ({ onUpload, onSync, isSyncing }: { onUpload: () => void, onS
     <div className="flex flex-col sm:flex-row gap-4">
       <button 
         onClick={onSync}
-        disabled={isSyncing}
-        className={cn(
-          "flex items-center justify-center gap-2 bg-adarco-dark hover:bg-black text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed min-w-[220px]",
-          isSyncing && "animate-pulse"
-        )}
+        className="flex items-center justify-center gap-2 bg-adarco-dark hover:bg-black text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95 min-w-[220px]"
       >
-        {isSyncing ? "Sincronizando..." : <><TrendingUp size={20} /> Sincronizar API</>}
+        <TrendingUp size={20} /> Sincronizar API
       </button>
       <button 
         onClick={onUpload}
@@ -103,6 +100,74 @@ const EmptyState = ({ onUpload, onSync, isSyncing }: { onUpload: () => void, onS
     </div>
   </div>
 );
+
+const LoadingOverlay = () => {
+  const messages = [
+    "Sincronizando sucessos... Quase pronto!",
+    "Buscando seus resultados extraordinários.",
+    "Organizando os insights mais valiosos do dia.",
+    "Transformando ligações em metas batidas!",
+    "Preparando um dashboard incrível para você.",
+    "Sincronizando o excelente trabalho da nossa equipe."
+  ];
+  
+  const [msgIndex, setMsgIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % messages.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-white/90 backdrop-blur-xl z-[100] flex flex-col items-center justify-center p-6 text-center"
+    >
+      <div className="relative mb-8">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+          className="w-20 h-20 border-4 border-adarco-light/30 border-t-adarco-primary rounded-full flex items-center justify-center shadow-lg shadow-adarco-primary/10"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="absolute inset-0 flex items-center justify-center"
+        >
+          <Sparkles className="w-8 h-8 text-adarco-primary" />
+        </motion.div>
+      </div>
+      
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={msgIndex}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-3"
+        >
+          <h2 className="text-2xl font-black text-adarco-dark tracking-tighter">
+            Atualizando API
+          </h2>
+          <p className="text-lg font-medium text-slate-500 max-w-sm">
+            {messages[msgIndex]}
+          </p>
+        </motion.div>
+      </AnimatePresence>
+      
+      <div className="mt-12 flex gap-2">
+        <div className="w-2 h-2 rounded-full bg-adarco-primary animate-bounce [animation-delay:-0.3s]" />
+        <div className="w-2 h-2 rounded-full bg-adarco-primary animate-bounce [animation-delay:-0.15s]" />
+        <div className="w-2 h-2 rounded-full bg-adarco-primary animate-bounce" />
+      </div>
+    </motion.div>
+  );
+};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -132,20 +197,20 @@ interface FilterSelectProps {
 
 const FilterSelect = ({ label, value, onChange, options, icon: Icon }: FilterSelectProps) => (
   <div className="space-y-2">
-    <p className="text-xs font-bold text-white/70 pl-1 flex items-center gap-2">
-      {Icon && <Icon className="w-3.5 h-3.5" />} {label}
+    <p className="text-[10px] font-black text-white/50 pl-1 flex items-center gap-2 uppercase tracking-wider">
+      {Icon && <Icon className="w-3 h-3" />} {label}
     </p>
-    <div className="relative">
+    <div className="relative group">
       <select 
-        className="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-4 pr-10 text-sm font-bold appearance-none focus:ring-2 focus:ring-white/20 focus:bg-[#004D2C] outline-none transition-all cursor-pointer text-white backdrop-blur-xl"
+        className="w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl py-3 pl-4 pr-10 text-sm font-bold appearance-none focus:ring-2 focus:ring-adarco-primary/20 focus:bg-[#004D2C] outline-none transition-all cursor-pointer text-white backdrop-blur-xl"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
         {options.map(opt => (
-          <option key={opt.value} className="bg-[#004D2C]" value={opt.value}>{opt.label}</option>
+          <option key={opt.value} className="bg-[#004D2C] py-2" value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50 pointer-events-none" />
+      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 group-hover:text-white/60 pointer-events-none transition-colors" />
     </div>
   </div>
 );
@@ -277,7 +342,7 @@ export default function App() {
           extension: consultant?.extension || origin || destiny,
           type: type as any
         };
-      }).filter((d: any) => d.type !== ''); 
+      }).filter((d: any) => d.type !== '' && d.consultantName); 
 
       setData(processedData);
       setLastUpdated(new Date());
@@ -752,6 +817,8 @@ export default function App() {
         </header>
 
         <AnimatePresence mode="wait">
+          {isSyncing && <LoadingOverlay />}
+          
           {data.length === 0 ? (
             <motion.div
               key="empty"
@@ -924,38 +991,55 @@ export default function App() {
                     const efficiency = team.total > 0 ? ((team.success / team.total) * 100).toFixed(1) : 0;
 
                     return (
-                      <div key={team.name} className="flex flex-col items-center">
-                        <div className="h-[220px] w-full relative">
+                      <div key={team.name} className="flex flex-col items-center bg-white/50 rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="h-[200px] w-full relative">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={65}
-                                outerRadius={85}
-                                paddingAngle={5}
+                                innerRadius={60}
+                                outerRadius={80}
+                                paddingAngle={8}
                                 dataKey="value"
                                 stroke="none"
+                                cornerRadius={10}
+                                startAngle={90}
+                                endAngle={-270}
                               >
-                                <Cell fill={color} />
+                                <Cell fill={color} className="drop-shadow-sm" />
                                 <Cell fill="#F1F5F9" />
                               </Pie>
-                              <Tooltip />
+                              <Tooltip 
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    return (
+                                      <div className="bg-white px-3 py-2 rounded-lg shadow-xl border border-slate-50 text-[10px] font-bold">
+                                        <span className={payload[0].name === 'Atendidas' ? "text-adarco-dark" : "text-slate-400"}>
+                                          {payload[0].name}: {payload[0].value}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
                             </PieChart>
                           </ResponsiveContainer>
                           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-2xl font-black text-slate-800 leading-none">{efficiency}%</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Eficiência</span>
+                            <span className="text-3xl font-black text-slate-800 tracking-tighter leading-none">{efficiency}%</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Score</span>
                           </div>
                         </div>
-                        <div className="mt-2 text-center">
-                          <h4 className="font-extrabold text-slate-700 uppercase tracking-tight">{team.name}</h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-bold text-slate-400">
-                              {team.success} <span className="font-medium text-slate-300">atendidas de</span> {team.total}
-                            </span>
+                        <div className="mt-4 text-center">
+                          <div className="px-4 py-1.5 bg-slate-50 rounded-full border border-slate-100 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                            <h4 className="text-xs font-black text-slate-700 uppercase tracking-tight">{team.name}</h4>
                           </div>
+                          <p className="mt-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <span className="text-slate-800">{team.success}</span> de {team.total} <span className="ml-1 text-slate-300">atendidas</span>
+                          </p>
                         </div>
                       </div>
                     );
