@@ -1,17 +1,30 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import app from "./api/index.ts";
+import apiApp from "./api/index.ts";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Helper to handle ESM/CJS differences for __dirname
+const getDirname = () => {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return process.cwd();
+  }
+};
+
+const __dirname = getDirname();
 
 async function startServer() {
+  const app = express();
   const PORT = 3000;
 
+  // Mount API routes first
+  app.use(apiApp);
+
   if (process.env.NODE_ENV !== "production") {
-    // Carregamento dinâmico do Vite para evitar problemas em produção
+    // Dynamic import for Vite to keep production bundle lean
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -20,7 +33,6 @@ async function startServer() {
     
     app.use(vite.middlewares);
     
-    // Fallback para o index.html no desenvolvimento (necessário para SPA logic em alguns setups)
     app.use("*", async (req, res, next) => {
       const url = req.originalUrl;
       try {
@@ -33,19 +45,26 @@ async function startServer() {
       }
     });
   } else {
-    // Servir arquivos estáticos em produção
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.error("Production 'dist' directory not found!");
+      app.get('*', (req, res) => {
+        res.status(500).send("Build artifacts missing. Please check the build logs.");
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Adarco] Server running at http://0.0.0.0:${PORT} (ENV: ${process.env.NODE_ENV || 'development'})`);
+    console.log(`Server listening on http://0.0.0.0:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   });
 }
 
 startServer().catch(err => {
-  console.error("Failed to start server:", err);
+  console.error("Critical failure during server startup:", err);
+  process.exit(1);
 });

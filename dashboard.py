@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
-# Mapeamento de Dados (Dicionário de Identidades)
+# CONFIGURAÇÕES E MAPEAMENTO ESTRITO
+# ---------------------------------------------------------
 CONSULTANT_MAPPING = {
-    # Time Débora (Supervisora - Ramal 6005)
+    # Time Débora (Supervisora: 6005)
     "6028": {"name": "Charlene", "team": "Time Débora"},
     "6002": {"name": "Erick", "team": "Time Débora"},
     "6007": {"name": "Everton", "team": "Time Débora"},
@@ -12,7 +14,7 @@ CONSULTANT_MAPPING = {
     "6046": {"name": "Karina", "team": "Time Débora"},
     "6029": {"name": "Rute", "team": "Time Débora"},
     
-    # Time Marília (Supervisora - Ramal 6038)
+    # Time Marília (Supervisora: 6038)
     "6036": {"name": "Aila", "team": "Time Marília"},
     "6026": {"name": "Kelvyn", "team": "Time Marília"},
     "6017": {"name": "Felipe", "team": "Time Marília"},
@@ -22,219 +24,111 @@ CONSULTANT_MAPPING = {
     "6030": {"name": "Kephini", "team": "Time Marília"},
 }
 
-def load_and_filter_data(file):
-    df = pd.read_csv(file)
-    
-    # Identifica colunas de origem e destino
-    col_orig = next((c for c in ['Origem', 'Ramal', 'Extension'] if c in df.columns), None)
-    col_dest = next((c for c in ['Destino', 'Destination', 'Número discado', 'Discado'] if c in df.columns), None)
-    col_tipo = next((c for c in ['Tipo', 'Type', 'tipo'] if c in df.columns), None)
+def process_data(df):
+    """Aplica o mapeamento estrito e filtragem de ramais."""
+    if df is None or df.empty:
+        return pd.DataFrame()
 
-    # Função para mapear consultor e time verificando as duas pontas da chamada
-    def map_columns(row):
-        orig = str(row.get(col_orig, '')).strip() if col_orig else ''
-        dest = str(row.get(col_dest, '')).strip() if col_dest else ''
-        
-        m_orig = CONSULTANT_MAPPING.get(orig)
-        m_dest = CONSULTANT_MAPPING.get(dest)
-        
-        mapping = m_orig or m_dest
+    # Identifica colunas de origem/ramal
+    col_ramal = next((c for c in ['Origem', 'Ramal', 'Extension', 'src', 'Source'] if c in df.columns), None)
+    
+    if not col_ramal:
+        return pd.DataFrame()
+
+    # Convoca ramais para string/texto
+    df[col_ramal] = df[col_ramal].astype(str).str.strip()
+
+    # Cria colunas Consultor e Equipe baseadas no mapping
+    def map_consultant(ramal):
+        mapping = CONSULTANT_MAPPING.get(ramal)
         if mapping:
-            return mapping['name'], mapping['team'], 'Receptiva' if (m_dest and not m_orig) else 'Ativa'
-        return None, None, 'Desconhecido'
+            return mapping['name'], mapping['team']
+        return None, None
 
-    # Aplica o mapeamento e gera novas colunas
-    map_results = df.apply(lambda r: map_columns(r), axis=1)
-    df['Consultor'] = [r[0] for r in map_results]
-    df['Time'] = [r[1] for r in map_results]
-    
-    # Se a coluna de tipo original existir, vamos aprimorar a detecção
-    if col_tipo:
-        def refine_type(row):
-            t = str(row[col_tipo]).lower()
-            if 'entr' in t or 'rec' in t or 'inbound' in t:
-                return 'Receptiva'
-            return row.get('Tipo_Detectado', 'Ativa') # Usa o que detectamos no mapeamento
-            
-        df['Tipo_Final'] = df.apply(refine_type, axis=1)
-        df[col_tipo] = df['Tipo_Final'] # Sobrescreve para manter consistência
-    
-    # Requisitos de Filtragem e Segurança:
-    # Bloqueio de Ramais Externos e Ocultar Não Identificados (Fora do Inside Sales)
+    res = df[col_ramal].apply(map_consultant)
+    df['Consultor'] = [r[0] for r in res]
+    df['Equipe'] = [r[1] for r in res]
+
+    # Regra de Exclusão: Remove qualquer ramal que NÃO esteja no mapeamento
     df = df.dropna(subset=['Consultor'])
     
-    # Processamento de Datas
-    col_data = 'Data' if 'Data' in df.columns else 'timestamp'
-    if col_data in df.columns:
+    # Processamento de Datas adicional
+    col_data = next((c for c in ['Data', 'timestamp', 'date', 'startDate'] if c in df.columns), None)
+    if col_data:
         df[col_data] = pd.to_datetime(df[col_data], errors='coerce')
         df = df.dropna(subset=[col_data])
-    
+
     return df
 
-# Configuração de Página e Estilo Customizado
+# CONFIGURAÇÃO DA INTERFACE
+# ---------------------------------------------------------
 st.set_page_config(page_title="Adarco BI - Inside Sales", layout="wide")
 
 st.markdown("""
 <style>
-    /* Estilização Geral */
-    .main {
-        background-color: #F8F9FA;
-    }
-    .stApp {
-        font-family: 'Montserrat', sans-serif;
-    }
-    
-    /* Sidebar Dark Mode Estilizada com Degradê Neon Invertido e Laminado */
+    .main { background-color: #F8F9FA; }
+    h1, h2, h3 { color: #004D2C; font-weight: 800; }
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, rgba(0, 245, 138, 0.4) 0%, rgba(0, 77, 45, 0.95) 70%, #003B22 100%) !important;
-        backdrop-filter: blur(20px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(180deg, rgba(0, 77, 45, 0.95) 0%, #003B22 100%) !important;
         color: white;
-    }
-    [data-testid="stSidebar"] .stDateInput label {
-        color: rgba(255,255,255,0.9) !important;
-        font-weight: 800 !important;
-    }
-    [data-testid="stSidebar"] input {
-        background-color: rgba(255,255,255,0.1) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.2) !important;
-    }
-    
-    /* Simulação de Glassmorphism nos Cards */
-    .kpi-card {
-        background-color: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        padding: 1.5rem;
-        border-radius: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        transition: all 0.3s ease;
-    }
-    .kpi-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 15px rgba(0,0,0,0.05);
-    }
-    
-    /* Títulos */
-    h1, h2, h3 {
-        color: #004D2C;
-        font-weight: 800;
-    }
-    
-    /* Botão de Ação */
-    .stButton>button {
-        background-color: #004D2C !important;
-        color: white !important;
-        border-radius: 12px !important;
-        font-weight: bold !important;
-        padding: 0.75rem 2rem !important;
-        border: none !important;
-        width: 100%;
-        transition: all 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #007A44 !important;
-        box-shadow: 0 4px 12px rgba(0,77,44,0.3);
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📞 Performance Inside Sales - Adarco")
+st.title("📂 Painel de Telefonia - Adarco")
+st.write("Analise o desempenho da equipe através do upload de arquivos CSV.")
 
-uploaded_file = st.file_uploader("Carregue o arquivo CSV de Telefonia", type="csv")
+# Upload de Arquivo
+uploaded_file = st.file_uploader("Suba o arquivo CSV de Telefonia", type="csv")
 
 if uploaded_file:
-    df = load_and_filter_data(uploaded_file)
-    
-    # Filtros de Interface (Sidebar)
-    st.sidebar.header("Filtros")
-    time_selecionado = st.sidebar.selectbox("Filtro por Time/Supervisora", ["Todos", "Time Débora", "Time Marília"])
-    
-    df_filtered = df if time_selecionado == "Todos" else df[df['Time'] == time_selecionado]
-    
-    consultores_disponiveis = ["Todos"] + sorted(df_filtered['Consultor'].unique().tolist())
-    consultor_selecionado = st.sidebar.selectbox("Filtro por Consultor", consultores_disponiveis)
-    
-    if consultor_selecionado != "Todos":
-        df_filtered = df_filtered[df_filtered['Consultor'] == consultor_selecionado]
-
-    # Filtro de Tipo (Topo da interface via rádio horizontal)
-    st.write("---")
-    tipo_selecionado = st.radio(
-        "Tipo de Chamada",
-        ["Todos", "Ativa", "Receptiva"],
-        horizontal=True
-    )
-    if tipo_selecionado != "Todos":
-        df_filtered = df_filtered[df_filtered[col_tipo].str.contains(tipo_selecionado, case=False, na=False)]
-
-    # Filtro de Data
-    col_data = 'Data' if 'Data' in df.columns else 'timestamp'
-    if col_data in df_filtered.columns:
-        min_date = df_filtered[col_data].min().date()
-        max_date = df_filtered[col_data].max().date()
+    try:
+        raw_df = pd.read_csv(uploaded_file)
+        df = process_data(raw_df)
         
-        st.sidebar.subheader("Período")
-        date_range = st.sidebar.date_input(
-            "Selecione o intervalo",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date
-        )
-        
-        if len(date_range) == 2:
-            start_date, end_date = date_range
-            df_filtered = df_filtered[
-                (df_filtered[col_data].dt.date >= start_date) & 
-                (df_filtered[col_data].dt.date <= end_date)
-            ]
+        if not df.empty:
+            st.sidebar.header("Filtros de Gestão")
+            
+            # Filtro por Equipe (Supervisora)
+            equipes = ["Todos"] + sorted(df['Equipe'].unique().tolist())
+            equipe_sel = st.sidebar.selectbox("Selecionar Equipe", equipes)
+            
+            df_filtered = df if equipe_sel == "Todos" else df[df['Equipe'] == equipe_sel]
+            
+            # Filtro por Consultor
+            consultores = ["Todos"] + sorted(df_filtered['Consultor'].unique().tolist())
+            consultor_sel = st.sidebar.selectbox("Selecionar Consultor", consultores)
+            
+            if consultor_sel != "Todos":
+                df_filtered = df_filtered[df_filtered['Consultor'] == consultor_sel]
 
-    # Visualização e Gráficos
-    st.subheader("Gráfico A: Volume Total de Ligações Ativas")
-    # Filtro de tipo de ligação (ajustar nome da coluna se necessário)
-    col_tipo = 'Tipo' if 'Tipo' in df.columns else 'Type'
-    df_ativas = df_filtered[df_filtered[col_tipo].str.contains('Ativa', case=False, na=False)]
-    
-    active_counts = df_ativas['Consultor'].value_counts()
-    st.bar_chart(active_counts)
+            # Visualizações Principais
+            col_m1, col_m2 = st.columns(2)
+            with col_m1:
+                st.metric("Total de Ligações Válidas", len(df_filtered))
+            
+            st.write("---")
+            col1, col2 = st.columns(2)
 
-    st.subheader("Gráfico B: Volume de Ligações Atendidas (Sucesso)")
-    col_status = 'Status' if 'Status' in df.columns else 'status'
-    df_atendidas = df_filtered[df_filtered[col_status].str.contains('Atendida', case=False, na=False)]
-    
-    success_counts = df_atendidas['Consultor'].value_counts()
-    st.bar_chart(success_counts)
+            with col1:
+                st.subheader("📊 Volume por Consultor")
+                active_counts = df_filtered['Consultor'].value_counts()
+                st.bar_chart(active_counts)
 
-    st.subheader("Performance por Consultor (TMA e Conversão)")
-    
-    # Cálculo de métricas por consultor
-    col_duracao = 'Duracao' if 'Duracao' in df.columns else ('Duração' if 'Duração' in df.columns else 'duration')
-    col_status = 'Status' if 'Status' in df.columns else 'status'
+            with col2:
+                st.subheader("✅ Distribuição por Equipe")
+                team_counts = df_filtered['Equipe'].value_counts()
+                st.bar_chart(team_counts)
 
-    # Precisão: TMA deve considerar apenas a duração de chamadas Atendidas
-    df_filtered['DuracaoAtendida'] = df_filtered.apply(
-        lambda x: x[col_duracao] if 'atend' in str(x[col_status]).lower() else 0, axis=1
-    )
-    
-    summary = df_filtered.groupby('Consultor').agg({
-        col_tipo: 'count',
-        col_status: lambda x: x.str.contains('Atendida', case=False, na=False).sum(),
-        'DuracaoAtendida': 'sum'
-    }).rename(columns={col_tipo: 'Total', col_status: 'Sucesso'})
-    
-    # Cálculo do TMA apenas para chamadas atendidas
-    summary['TMA'] = summary.apply(
-        lambda row: round(row['DuracaoAtendida'] / row['Sucesso'], 2) if row['Sucesso'] > 0 else 0, 
-        axis=1
-    )
-    
-    summary['Efetividade %'] = (summary['Sucesso'] / summary['Total'] * 100).round(1)
-    
-    st.write(summary[['Total', 'Sucesso', 'Efetividade %', 'TMA']])
-    
-    st.subheader("Destaque Comparativo entre Times")
-    team_comparison = df.groupby('Time').size()
-    st.write(team_comparison)
+            # Tabela de Performance
+            st.subheader("📈 Performance Detalhada")
+            summary = df_filtered.groupby(['Consultor', 'Equipe']).size().reset_index(name='Total')
+            st.dataframe(summary.style.highlight_max(axis=0, subset=['Total']), use_container_width=True)
+
+        else:
+            st.error("Nenhum ramal mapeado foi encontrado no arquivo enviado. Verifique se o formato está correto.")
+    except Exception as e:
+        st.error(f"Erro ao processar o arquivo: {e}")
 else:
-    st.info("Por favor, carregue um arquivo CSV para começar.")
+    st.info("Por favor, carregue um arquivo CSV para começar a análise.")
+

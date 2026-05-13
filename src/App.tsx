@@ -9,7 +9,7 @@ import {
   TrendingUp, Filter, Upload,
   Users, CheckCircle2, XCircle, Search, Calendar,
   ChevronDown, ArrowUpRight, ArrowDownRight, Menu, X,
-  Loader2, Sparkles
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { parse } from 'date-fns';
@@ -74,100 +74,24 @@ const StatCard = ({ title, value, subtext, icon: Icon, trend, colorClass = "prim
   </motion.div>
 );
 
-const EmptyState = ({ onUpload, onSync, isSyncing }: { onUpload: () => void, onSync: () => void, isSyncing: boolean }) => (
+const EmptyState = ({ onUpload }: { onUpload: () => void }) => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
     <div className="w-16 h-16 md:w-20 md:h-20 bg-adarco-light/30 rounded-full flex items-center justify-center mb-6">
       <Users className="w-8 h-8 md:w-10 md:h-10 text-adarco-dark" />
     </div>
     <h2 className="text-2xl md:text-3xl font-black text-adarco-dark tracking-tighter mb-2 text-center md:text-left">Dashboard Inside Sales</h2>
     <p className="text-slate-500 max-w-md mb-8 font-medium text-center md:text-left text-sm md:text-base">
-      Sincronize os dados diretamente da API de telefonia ou carregue um relatório CSV manualmente.
+      Carregue o relatório CSV exportado da telefonia para analisar a performance da equipe. Os dados serão salvos localmente.
     </p>
-    <div className="flex flex-col sm:flex-row gap-4">
-      <button 
-        onClick={onSync}
-        className="flex items-center justify-center gap-2 bg-adarco-dark hover:bg-black text-white px-8 py-3 rounded-xl font-semibold transition-all shadow-lg active:scale-95 min-w-[220px]"
-      >
-        <TrendingUp size={20} /> Sincronizar API
-      </button>
       <button 
         onClick={onUpload}
-        className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-8 py-3 rounded-xl font-semibold transition-all shadow-sm active:scale-95"
+        title="Carregar Relatório CSV"
+        className="flex items-center justify-center bg-adarco-dark hover:bg-black text-white w-20 h-20 rounded-3xl transition-all shadow-xl active:scale-95"
       >
-        <Upload size={20} />
-        Carregar CSV
+        <Upload size={32} />
       </button>
-    </div>
   </div>
 );
-
-const LoadingOverlay = () => {
-  const messages = [
-    "Sincronizando sucessos... Quase pronto!",
-    "Buscando seus resultados extraordinários.",
-    "Organizando os insights mais valiosos do dia.",
-    "Transformando ligações em metas batidas!",
-    "Preparando um dashboard incrível para você.",
-    "Sincronizando o excelente trabalho da nossa equipe."
-  ];
-  
-  const [msgIndex, setMsgIndex] = React.useState(0);
-
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setMsgIndex((prev) => (prev + 1) % messages.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-white/90 backdrop-blur-xl z-[100] flex flex-col items-center justify-center p-6 text-center"
-    >
-      <div className="relative mb-8">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-20 h-20 border-4 border-adarco-light/30 border-t-adarco-primary rounded-full flex items-center justify-center shadow-lg shadow-adarco-primary/10"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <Sparkles className="w-8 h-8 text-adarco-primary" />
-        </motion.div>
-      </div>
-      
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={msgIndex}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-3"
-        >
-          <h2 className="text-2xl font-black text-adarco-dark tracking-tighter">
-            Atualizando API
-          </h2>
-          <p className="text-lg font-medium text-slate-500 max-w-sm">
-            {messages[msgIndex]}
-          </p>
-        </motion.div>
-      </AnimatePresence>
-      
-      <div className="mt-12 flex gap-2">
-        <div className="w-2 h-2 rounded-full bg-adarco-primary animate-bounce [animation-delay:-0.3s]" />
-        <div className="w-2 h-2 rounded-full bg-adarco-primary animate-bounce [animation-delay:-0.15s]" />
-        <div className="w-2 h-2 rounded-full bg-adarco-primary animate-bounce" />
-      </div>
-    </motion.div>
-  );
-};
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -221,7 +145,6 @@ export default function App() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [data, setData] = useState<CallRecord[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<string>('Todos');
   const [selectedConsultant, setSelectedConsultant] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
@@ -235,17 +158,23 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Sincroniza automaticamente ao abrir o sistema e a cada 5 minutos
+  // Sincronização automática removida
+  // Carrega dados persistidos do localStorage ao iniciar
   React.useEffect(() => {
-    syncWithAPI();
-    
-    const interval = setInterval(() => {
-      console.log("[Auto-Refresh] Iniciando atualização programada (5 min)...");
-      syncWithAPI();
-    }, 5 * 60 * 1000); // 5 minutos
-
-    return () => clearInterval(interval);
-  }, [startDate, endDate]);
+    const savedData = localStorage.getItem('adarco_persisted_calls');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setData(parsed);
+          setLastUpdated(new Date());
+          console.log("[App] Dados recuperados do armazenamento local.");
+        }
+      } catch (e) {
+        console.error("[App] Erro ao carregar cache local:", e);
+      }
+    }
+  }, []); 
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -260,134 +189,95 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const syncWithAPI = async () => {
-    setIsSyncing(true);
-    setErrorMsg(null);
-    try {
-      const params = new URLSearchParams();
-      
-      // Se tiver data, garante que pega o dia inteiro (00:00 até 23:59)
-      if (startDate) {
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0);
-        params.append("startDate", start.toISOString());
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        params.append("endDate", end.toISOString());
-      }
-      
-      params.append("limit", "1000");
-
-      console.log("[App] Sincronizando com params:", params.toString());
-      const response = await fetch(`/api/telephony/calls?${params.toString()}`);
-      
-      if (!response.ok) {
-        let errorInfo;
-        try {
-          errorInfo = await response.json();
-        } catch {
-          errorInfo = { error: "Erro desconhecido na rede." };
-        }
-        
-        const detail = errorInfo.detail ? (typeof errorInfo.detail === 'object' ? JSON.stringify(errorInfo.detail) : errorInfo.detail) : "";
-        throw new Error(`${errorInfo.error || "Falha na API"} ${detail}`);
-      }
-
-      const result = await response.json();
-      console.log("[App] Resultado bruto da API:", result);
-      
-      // Verificando se é array ou tem campo data
-      // Algumas APIs paginadas retornam { data: [], total: ... } ou { calls: [], ... }
-      const rawCalls = Array.isArray(result) 
-        ? result 
-        : (result.data || result.calls || result.ligacoes || []);
-
-      console.log(`[App] Total de chamadas brutas recebidas: ${rawCalls.length}`);
-
-      if (rawCalls.length === 0) {
-        setErrorMsg("A API retornou zero chamadas para este período. Verifique se há dados no painel da Bem Melhor ou tente aumentar o intervalo de datas.");
-        return;
-      }
-
-      const processedData: CallRecord[] = rawCalls.map((call: any) => {
-        const origin = String(call.origin || '');
-        const destiny = String(call.destiny || '');
-        const mappingOrig = CONSULTANT_MAPPING[origin];
-        const mappingDest = CONSULTANT_MAPPING[destiny];
-        
-        const consultant = mappingOrig || mappingDest;
-        const typeRaw = String(call.type || '').toLowerCase();
-        
-        let type = '';
-        if (typeRaw.includes('sainte') || typeRaw.includes('outbound')) {
-          type = 'Ativa';
-        } else if (typeRaw.includes('entrante') || typeRaw.includes('inbound')) {
-          type = 'Receptiva';
-        }
-
-        const disposition = String(call.disposition || call.status || '').toUpperCase();
-        // Critério técnico Adarco: Bilhetagem > 0 significa que houve atendimento real
-        const billablesec = Number(call.billablesec || 0);
-        const isAttended = disposition.includes('ANSWER') || disposition.includes('ATEND') || billablesec > 0;
-        const status = isAttended ? 'Atendida' : 'Perdida';
-
-        return {
-          timestamp: new Date(call.startDate || call.date || Date.now()).toISOString(),
-          status,
-          duration: billablesec, // Usamos o tempo de fala como duração principal
-          consultantName: consultant?.name,
-          team: consultant?.team,
-          extension: consultant?.extension || origin || destiny,
-          type: type as any
-        };
-      }).filter((d: any) => d.type !== '' && d.consultantName); 
-
-      setData(processedData);
-      setLastUpdated(new Date());
-    } catch (error: any) {
-      console.error("Erro na sincronização:", error);
-      setErrorMsg(error.message || "Erro ao conectar com a API de telefonia.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const triggerFileUpload = () => {
     setErrorMsg(null);
     fileInputRef.current?.click();
   };
 
-  const processFile = (file: File) => {
+  const processFile = (file: File | string) => {
     setErrorMsg(null);
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      delimiter: ";", // Explicitly set semicolon as seen in the provided file
       complete: (results) => {
         if (!results.data || results.data.length === 0) {
           setErrorMsg("O arquivo parece estar vazio ou em formato inválido.");
           return;
         }
 
+        const seenUniqueIds = new Set<string>();
         const parsedData: CallRecord[] = results.data
           .map((row: any) => {
-            // Busca o ramal tanto na origem quanto no destino (comum em chamadas Receptivas)
-            const orig = String(row['Origem'] || row['Ramal'] || row['Extension'] || '').trim();
-            const dest = String(row['Destino'] || row['Destination'] || row['Número discado'] || row['Discado'] || '').trim();
+            const uniqueId = String(row['Uniqueid'] || row['Identificador'] || row['uniqueid'] || '');
+            if (uniqueId && seenUniqueIds.has(uniqueId)) return null;
+            if (uniqueId) seenUniqueIds.add(uniqueId);
+
+            const rawOrigin = String(row['Origem'] || row['src'] || '');
+            const rawDestiny = String(row['Destino'] || row['dst'] || '');
+
+            const getExtension = (val: string) => {
+              if (!val) return '';
+              const match = val.match(/\((\d+)\)/); 
+              if (match) return match[1];
+              const digitMatch = val.match(/(\d{4,5})/);
+              if (digitMatch) return digitMatch[1];
+              const cleaned = val.replace(/[^\d]/g, '').trim();
+              return cleaned.length >= 4 && cleaned.length <= 5 ? cleaned : '';
+            };
+
+            const getNameFromRaw = (val: string) => {
+              const insMatch = val.match(/^(.*?)\s*-\s*INS/i) || val.match(/^(.*?)\s+INS/i);
+              if (insMatch) return insMatch[1].trim();
+              return null;
+            };
+
+            const originExt = getExtension(rawOrigin);
+            const destinyExt = getExtension(rawDestiny);
             
-            const mappingOrig = CONSULTANT_MAPPING[orig];
-            const mappingDest = CONSULTANT_MAPPING[dest];
+            const mappingOrig = CONSULTANT_MAPPING[originExt];
+            const mappingDest = CONSULTANT_MAPPING[destinyExt];
             
-            // Log para debug de ramais ignorados
-            if (!mappingOrig && !mappingDest) {
-              console.log(`[CSV] Ramal ignorado: Orig=${orig}, Dest=${dest}`);
+            let consultantName = null;
+            let team = null;
+            let ext = '';
+            let foundIn: 'origin' | 'destiny' | null = null;
+
+            if (mappingOrig) {
+              consultantName = mappingOrig.name;
+              team = mappingOrig.team;
+              ext = originExt;
+              foundIn = 'origin';
+            } else if (mappingDest) {
+              consultantName = mappingDest.name;
+              team = mappingDest.team;
+              ext = destinyExt;
+              foundIn = 'destiny';
             }
 
-            const mapping = mappingOrig || mappingDest;
-            if (!mapping) return null;
+            if (!consultantName) return null;
 
-            const extensionIdentified = mappingOrig ? orig : dest;
+            const typeRaw = String(row['Tipo'] || row['tipo'] || '').toLowerCase();
+            if (typeRaw.includes('interna') || typeRaw.includes('internal')) return null;
+
+            let type = '';
+            if (typeRaw.includes('sainte') || typeRaw.includes('outbound')) {
+              type = 'Ativa';
+            } else if (typeRaw.includes('entrante') || typeRaw.includes('inbound')) {
+              type = 'Receptiva';
+            } else if (foundIn) {
+              type = foundIn === 'origin' ? 'Ativa' : 'Receptiva';
+            } else {
+              return null;
+            }
+
+            const bilhetagemRaw = row['Bilhetagem'] || row['billablesec'] || '0';
+            const bilhetagem = parseInt(bilhetagemRaw) || 0;
+
+            const statusRaw = String(row['Status'] || row['status'] || '').toUpperCase();
+            // A ligação é considerada "Atendida" (Efetiva) apenas se durou no mínimo 20 segundos
+            const isAttended = (statusRaw.includes('ATEND') || statusRaw.includes('ANSWER') || bilhetagem > 0) && bilhetagem >= 20;
+            const status = isAttended ? 'Atendida' : 'Perdida';
 
             const timestampStr = row['Data'] || row['timestamp'] || '';
             let timestamp = new Date();
@@ -403,51 +293,29 @@ export default function App() {
               } catch (e) {}
             }
 
-            const bilhetagemRaw = row['Bilhetagem'] || row['billablesec'] || '0';
-            const bilhetagem = parseInt(bilhetagemRaw) || 0;
-
-            const statusRaw = String(row['Status'] || row['status'] || row['disposition'] || '').toUpperCase();
-            // Critério técnico Adarco: Bilhetagem > 0 significa que houve atendimento real
-            const isAttended = statusRaw.includes('ANSWER') || statusRaw.includes('ATEND') || bilhetagem > 0;
-            const status = isAttended ? 'Atendida' : 'Perdida';
-            
-            const typeRaw = String(row['Tipo'] || row['tipo'] || row['type'] || '').toLowerCase();
-            
-            // Filtros solicitados: ignorar 'internal' e aceitar apenas 'sainte'/'outbound' ou 'entrante'/'inbound'
-            if (typeRaw.includes('internal')) return null;
-
-            let type = '';
-            if (typeRaw.includes('sainte') || typeRaw.includes('outbound')) {
-              type = 'Ativa';
-            } else if (typeRaw.includes('entrante') || typeRaw.includes('inbound')) {
-              type = 'Receptiva';
-            } else {
-              return null;
-            }
-
             return {
-              extension: extensionIdentified,
+              extension: ext,
               type,
               status,
               duration: bilhetagem,
               timestamp: timestamp.toISOString(),
-              consultantName: mapping.name,
-              team: mapping.team
+              consultantName,
+              team: team as any
             };
           })
           .filter((item): item is CallRecord => item !== null);
 
         if (parsedData.length > 0) {
           setData(parsedData);
+          setLastUpdated(new Date());
           
-          // Set initial date range
           const dates = parsedData.map(d => new Date(d.timestamp).getTime());
           const minDate = new Date(Math.min(...dates)).toISOString().split('T')[0];
           const maxDate = new Date(Math.max(...dates)).toISOString().split('T')[0];
           setStartDate(minDate);
           setEndDate(maxDate);
         } else {
-          setErrorMsg("Nenhum dado de Inside Sales (Débora/Marília) foi encontrado no arquivo.");
+          setErrorMsg("Nenhum dado de Inside Sales foi encontrado no arquivo.");
         }
       },
       error: (error) => {
@@ -464,9 +332,20 @@ export default function App() {
 
   const availableConsultants = useMemo(() => {
     const baseList = Object.values(CONSULTANT_MAPPING);
-    if (selectedTeam === 'Todos') return ['Todos', ...Array.from(new Set(baseList.map(c => c.name)))].sort();
-    return ['Todos', ...baseList.filter(c => c.team === selectedTeam).map(c => c.name)].sort();
+    if (selectedTeam === 'Todos') {
+       const names = Array.from(new Set(baseList.map(c => c.name))).sort();
+       return ['Todos', ...names];
+    }
+    const filtered = baseList.filter(c => c.team === selectedTeam).map(c => c.name).sort();
+    return ['Todos', ...filtered];
   }, [selectedTeam]);
+
+  // Reseta o filtro de consultor se a seleção atual não estiver mais na lista permitida
+  React.useEffect(() => {
+    if (selectedConsultant !== 'Todos' && !availableConsultants.includes(selectedConsultant)) {
+      setSelectedConsultant('Todos');
+    }
+  }, [availableConsultants, selectedConsultant]);
 
   const dateFilteredData = useMemo(() => {
     return data.filter(item => {
@@ -495,7 +374,7 @@ export default function App() {
     const successCounts: Record<string, { name: string, count: number, team: string }> = {};
     const summary: Record<string, { 
       name: string, 
-      team: TeamName, 
+      team: string, 
       extension: string,
       total: number, 
       success: number, 
@@ -504,7 +383,7 @@ export default function App() {
 
     // Initialize counts for all consultants in selected team
     Object.values(CONSULTANT_MAPPING).forEach(c => {
-      if (selectedTeam === 'Todos' || c.team === selectedTeam) {
+      if (selectedTeam === 'Todos' || c.team === (selectedTeam as any)) {
         activeCounts[c.name] = { name: c.name, count: 0, team: c.team };
         successCounts[c.name] = { name: c.name, count: 0, team: c.team };
       }
@@ -517,27 +396,39 @@ export default function App() {
       const { consultantName, type, status, duration, team, extension } = call;
       if (!consultantName) return;
 
+      // Update global KPI counters
+      if (type === 'Ativa') activeCountTotal++;
+      if (status === 'Atendida') successCountTotal++;
+
       // Update active/success counts if consultant is in the selected set
       if (activeCounts[consultantName]) {
         if (type === 'Ativa') {
           activeCounts[consultantName].count++;
         }
+      } else if (selectedTeam === 'Todos' || team === selectedTeam) {
+          // For dynamic INS not in static mapping
+          if (!activeCounts[consultantName]) {
+            activeCounts[consultantName] = { name: consultantName, count: 0, team: team || "Inside Sales" };
+          }
+          if (type === 'Ativa') activeCounts[consultantName].count++;
       }
+
       if (successCounts[consultantName]) {
         if (status === 'Atendida') {
           successCounts[consultantName].count++;
         }
+      } else if (selectedTeam === 'Todos' || team === selectedTeam) {
+         if (!successCounts[consultantName]) {
+            successCounts[consultantName] = { name: consultantName, count: 0, team: team || "Inside Sales" };
+          }
+          if (status === 'Atendida') successCounts[consultantName].count++;
       }
-
-      // Update global KPI counters
-      if (type === 'Ativa') activeCountTotal++;
-      if (status === 'Atendida') successCountTotal++;
 
       // Update Summary table data
       if (!summary[consultantName]) {
         summary[consultantName] = {
           name: consultantName,
-          team: team as TeamName,
+          team: team || "Inside Sales",
           extension: extension,
           total: 0,
           success: 0,
@@ -751,10 +642,16 @@ export default function App() {
                 </>
               )}
               <div className="w-1.5 h-1.5 bg-adarco-light rounded-full shadow-sm" />
-              <span className="text-[10px] font-black text-white bg-adarco-primary px-3 py-1 rounded-lg uppercase tracking-widest shadow-sm">
+              <p className="text-xs font-black text-slate-400 bg-slate-50 px-3 py-1 rounded-lg uppercase tracking-widest shadow-sm">
                 Foco em Resultados
-              </span>
+              </p>
             </div>
+            {errorMsg && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 animate-shake">
+                <XCircle className="w-5 h-5 text-red-500" />
+                <p className="text-sm font-bold text-red-600">{errorMsg}</p>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full md:w-auto">
@@ -773,25 +670,14 @@ export default function App() {
                     {type}
                   </button>
                 ))}
-             </div>
-             <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button 
-                    onClick={syncWithAPI}
-                    disabled={isSyncing}
-                    title="Sincronizar com API"
-                    className={cn(
-                      "p-3 bg-adarco-dark text-white rounded-2xl hover:bg-black transition-all shadow-soft flex items-center justify-center min-w-[48px] h-[48px]",
-                      isSyncing && "animate-spin"
-                    )}
-                >
-                    <TrendingUp className="w-5 h-5" />
-                </button>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button 
                     onClick={triggerFileUpload}
                     title="Carregar CSV"
-                    className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-600 hover:bg-slate-50 transition-all shadow-soft flex items-center justify-center min-w-[48px] h-[48px]"
+                    className="flex items-center justify-center p-3 bg-adarco-dark text-white rounded-2xl hover:bg-black transition-all shadow-soft w-[48px] h-[48px] shrink-0"
                 >
-                    <Upload className="w-5 h-5" />
+                    <Upload className="w-5 h-5 font-bold" />
                 </button>
                 <div className="relative group flex-1 sm:flex-none">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 transition-colors group-focus-within:text-adarco-primary" />
@@ -809,13 +695,11 @@ export default function App() {
                 >
                     {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 </button>
-             </div>
+              </div>
           </div>
         </header>
 
         <AnimatePresence mode="wait">
-          {isSyncing && <LoadingOverlay />}
-          
           {data.length === 0 ? (
             <motion.div
               key="empty"
@@ -823,7 +707,7 @@ export default function App() {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
             >
-              <EmptyState onUpload={triggerFileUpload} onSync={syncWithAPI} isSyncing={isSyncing} />
+              <EmptyState onUpload={triggerFileUpload} />
               {errorMsg && (
                 <p className="mt-4 text-center text-sm font-bold text-red-500 bg-red-50 py-2 rounded-lg max-w-sm mx-auto">
                   {errorMsg}
@@ -854,16 +738,16 @@ export default function App() {
                   colorClass="secondary"
                 />
                 <StatCard 
-                  title="Sucesso (Atendidas)" 
+                  title="Sucesso (Efetivas)" 
                   value={kpis.success} 
-                  subtext="Contatos efetivos"
+                  subtext="Ligações ≥ 20s"
                   icon={CheckCircle2}
                   colorClass="primary"
                 />
                 <StatCard 
                   title="Efetividade de Contato" 
                   value={`${kpis.successRate.toFixed(1)}%`}
-                  subtext="Taxa de sucesso global"
+                  subtext="Proporção ≥ 20s"
                   icon={TrendingUp}
                   trend={kpis.successRate > 70 ? 4 : -2}
                   colorClass="primary"
