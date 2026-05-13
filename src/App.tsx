@@ -554,10 +554,7 @@ export default function App() {
 
     const activeCallsByConsultant = Object.values(activeCounts).sort((a, b) => b.count - a.count);
     const successCallsByConsultant = Object.values(successCounts).sort((a, b) => b.count - a.count);
-    const consultantSummary = Object.values(summary).map(s => ({
-      ...s,
-      tma: s.success > 0 ? Math.round(s.totalDuration / s.success) : 0
-    })).sort((a, b) => b.total - a.total);
+    const consultantSummary = Object.values(summary).sort((a, b) => b.total - a.total);
 
     const total = filteredData.length;
     const successRate = total > 0 ? (successCountTotal / total) * 100 : 0;
@@ -1063,7 +1060,6 @@ export default function App() {
                         <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Ligações</th>
                         <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Sucesso</th>
                         <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-center">Efet. %</th>
-                        <th className="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">TMA</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -1101,9 +1097,6 @@ export default function App() {
                                 />
                               </div>
                             </div>
-                          </td>
-                          <td className="px-8 py-5 text-right font-mono text-sm font-extrabold text-adarco-dark">
-                            {formatDuration(item.tma)}
                           </td>
                         </tr>
                       ))}
