@@ -640,23 +640,7 @@ export default function App() {
               <PhoneCall className="w-7 h-7 text-white" />
             </div>
             <div 
-              onClick={() => {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                
-                const firstDayStr = `${year}-${month}-01`;
-                const todayStr = `${year}-${month}-${day}`;
-                
-                setData([]);
-                setErrorMsg(null);
-                setSelectedTeam('Todos');
-                setSelectedConsultant('Todos');
-                setSearchQuery('');
-                setStartDate(firstDayStr);
-                setEndDate(todayStr);
-              }}
+              onClick={() => window.location.reload()}
               className="cursor-pointer group select-none"
             >
               <h1 className="font-black text-xl tracking-tighter text-white drop-shadow-sm group-hover:text-adarco-primary transition-colors">ADARCO</h1>
